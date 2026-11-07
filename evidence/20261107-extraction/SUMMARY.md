@@ -63,7 +63,12 @@ intentionally excluded). Its SHA-256 is stored in
 - The old Flint landing site (<https://danilagrinrus.github.io/Flint/>) was
   removed: the GitHub Pages API refused deactivation (HTTP 422), so the
   `gh-pages` branch was deleted, which disabled Pages automatically; the old URL
-  now returns HTTP 404. The Flint repository itself was otherwise untouched.
+  now returns HTTP 404.
+- The Flint repository itself is now an **archived pointer**: all sources,
+  releases, tags and the old history on `master` were replaced by a single
+  README linking to GrinMessenger; issues/projects/wiki are disabled. Full
+  repository deletion requires the GitHub `delete_repo` token scope (not granted
+  in this session); until then the pointer repository remains as requested.
 - Documentation and the landing page are in English; the detailed extraction
   report and verifier report remain in Russian as historical artifacts.
 

@@ -1,0 +1,38 @@
+=== Flint repository: code removed, archived pointer to GrinMessenger (2026-11-07) ===
+
+RESULT
+- https://github.com/DanilaGrinRus/Flint is now an archived public pointer repository.
+- Content: only README.md with the requested text and a link to GrinMessenger.
+- Releases (3) and tags (3) deleted; branches: master only; deployments/Pages
+  already disabled earlier (gh-pages branch removed, old site URL = HTTP 404).
+- Issues/projects/wiki/discussions disabled; description and homepage point to
+  GrinMessenger.
+- Default branch: master; force-pushed orphan commit 64bb38f:
+  "Flint: extract messenger module to GrinMessenger; repository is now a pointer".
+
+README text (as requested; RU + EN):
+  # Flint
+  Как и планировалось, модуль мессенджера выделен отдельно:
+  → GrinMessenger — https://github.com/DanilaGrinRus/GrinMessenger
+  As planned, the messenger module has been extracted into a separate project:
+  → GrinMessenger — https://github.com/DanilaGrinRus/GrinMessenger
+  The former Flint application sources are no longer maintained in this repository.
+
+LIMITATIONS
+- Full deletion of the repository itself is not possible with the current GitHub
+  token: "gh repo delete" returns HTTP 403 "This API operation needs the
+  delete_repo scope." The owner can grant the scope and then delete the repo, or
+  delete it in Settings -> Danger Zone.
+- The master branch no longer references the old Flint sources; old commits are
+  unreachable from refs but may remain retrievable by SHA until GitHub garbage
+  collection. A guaranteed purge requires deleting and recreating the repository
+  (needs the delete_repo scope).
+
+COMMANDS (summary)
+  git init/commit pointer README; git push --force origin master  -> exit 0
+  gh api -X DELETE releases/<id> (x3)                            -> exit 0
+  gh api -X DELETE git/refs/tags/<tag> (x3)                      -> exit 0
+  PATCH metadata (description/homepage, issues/projects/wiki off) -> exit 0
+  PATCH archived=true                                            -> exit 0
+
+Date: 2026-11-07
