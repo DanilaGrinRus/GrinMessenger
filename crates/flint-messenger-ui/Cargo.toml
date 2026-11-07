@@ -1,0 +1,21 @@
+[package]
+name = "flint-messenger-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Local web UI for GrinMessenger: chat, contacts and envelope inspector over relay or direct Arti onion"
+
+[dependencies]
+flint-messenger = { path = "../flint-messenger" }
+flint-gateway = { path = "../flint-gateway" }
+flint-tor-arti = { path = "../flint-tor-arti" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+data-encoding = "2"
+getrandom = "0.2"
+
+[[bin]]
+name = "flintmsg-ui"
+path = "src/main.rs"

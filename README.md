@@ -24,12 +24,12 @@ this is not the Flint wallet.
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
-Status (2026-11-07): **extraction and adaptation are complete; offline build is
-PASS, 125 automated tests are PASS (0 failed, 3 ignored), the loopback E2E and
-real CLI processes are PASS. Live Tor is FAILED / NOT VERIFIED: in the build
-environment Arti did not finish bootstrap within 300 s because the Tor network is
-unreachable. This is not reported as a pass.** See
-[evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
+Status (2026-11-08): **extraction and adaptation are complete; offline build is
+PASS, 127 automated tests are PASS (0 failed, 3 ignored), the loopback E2E,
+real CLI processes and the local web UI are PASS. Live Tor is FAILED /
+NOT VERIFIED: in the build environment Arti did not finish bootstrap within
+300 s because the Tor network is unreachable. This is not reported as a pass.**
+See [evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
 and [REPORT.md](evidence/20261107-extraction/REPORT.md) (the detailed extraction
 report and verifier logs are kept in Russian as historical evidence).
 This is a DEV/testnet tool: not audited, not ready for mainnet.
@@ -42,6 +42,7 @@ This is a DEV/testnet tool: not audited, not ready for mainnet.
 | `flint-tor-arti` | — | in-process Tor: onion v3 from the ed25519 seed, onion service, HTTP client through Arti |
 | `flint-gateway` | `flint-relay` | loopback gateway / standalone store-and-forward relay without a wallet |
 | `flint-messenger-cli` | `flintmsg` | two-peer CLI: keygen / address / serve / send / fetch |
+| `flint-messenger-ui` | `flintmsg-ui` | local web UI: chat, contacts, envelope inspector, transcript export, relay/direct modes |
 
 ## Build
 
@@ -106,6 +107,31 @@ Without `--plain`, the CLI goes through Arti and can use a `.onion` relay.
 `flint-relay` enables `require_pow` and `require_signed_ack`; messages are opaque
 envelopes, so the relay cannot read the plaintext.
 
+## Web UI (local browser)
+
+A local web front-end is included: `flintmsg-ui`. The Rust process serves one
+embedded page over loopback HTTP (no Node.js, no WebView2, no CDN). It shows the
+chat, encrypted-transport status, contacts and an **envelope inspector** (id,
+TTL, PoW bits, route, size), and exports the transcript as JSON.
+
+![GrinMessenger web UI](docs/assets/ui.png)
+
+```powershell
+# relay mode (works without Tor; run a local flint-relay first, or use any relay)
+cargo run -p flint-messenger-ui --bin flintmsg-ui -- `
+  --data ui-data --relay http://127.0.0.1:8080 --plain
+# the binary prints UI_URL=http://127.0.0.1:PORT/ — open it in a browser
+
+# direct mode: without --relay the UI starts an Arti onion service (needs Tor)
+cargo run -p flint-messenger-ui --bin flintmsg-ui -- --data ui-data
+```
+
+The UI creates `identity.json` in the data directory when missing and keeps
+`history.json` / `contacts.json` there. It binds to loopback by default and has
+**no authentication**: do not expose it to a network. `--help` lists all flags
+(`--identity`, `--network`, `--listen`, `--relay`, `--plain`, `--tor-state`,
+`--poll-secs`).
+
 ## Using it as a library
 
 ```rust
@@ -141,18 +167,22 @@ cargo test -p flint-gateway --test relay_live -- --ignored    # spawns flint-rel
 Run results (commands, PASS/FAIL, live Tor NOT VERIFIED when the network is
 unavailable) are in [evidence/20261107-extraction/](evidence/20261107-extraction/).
 Summary: `cargo build --workspace --offline --locked` — PASS;
-`cargo test --workspace --offline --locked` — 125 passed / 0 failed / 3 ignored
+`cargo test --workspace --offline --locked` — 127 passed / 0 failed / 3 ignored
 (`relay_live`, live Nostr, `live_onion`); `cargo fmt --check` — PASS.
+The web-UI integration tests spawn a real UI process and a real relay, and the
+demo screenshot in [docs/assets/ui.png](docs/assets/ui.png) was taken from a
+running instance.
 
 ## Not included
 
 - Wallet, Grin node, owner/foreign API, Slatepack transactions and their
   automatic processing (S1/S2).
-- The Flint desktop Slint UI and the iOS client.
+- The Flint desktop Slint wallet UI and the iOS client (the new local web UI is
+  included above).
 - Groups, attachments, ratchet/forward secrecy, guaranteed offline delivery,
   public abuse control and a custom P2P protocol.
 - The Nostr transport exists in the library as a separate delivery option, but
-  the v1 CLI does not enable it.
+  the v1 CLI/UI do not enable it.
 
 ## Limitations and honest claims
 

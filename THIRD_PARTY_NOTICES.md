@@ -61,7 +61,7 @@ are dual/ tri-licensed (for example `priority-queue` is `LGPL-3.0-or-later OR
 MPL-2.0`, `r-efi` is `MIT OR Apache-2.0 OR LGPL-2.1-or-later`); the MIT/Apache/MPL
 options are the selectable ones, and no GPL-only dependency is used.
 
-## Landing page
+## Landing page and web UI
 
 The landing page under `site/` is adapted from the Flint project's own landing
 page (`site/en/index.html`, `site/styles.css`, `site/assets/logo.svg`) with new
@@ -69,6 +69,12 @@ content and a new logo for GrinMessenger. Flint-authored material was relicensed
 by the copyright holder under MIT OR Apache-2.0 (see `PROVENANCE.md`). No
 external fonts, CDNs or third-party scripts are used; the page is fully
 self-contained.
+
+The screenshot `docs/assets/ui.png` / `site/assets/ui.png` is a capture of this
+project's own web UI (demo run on loopback) and contains no third-party assets.
+The UI itself is served by `crates/flint-messenger-ui`: a Rust std HTTP server
+with one embedded HTML page, no WebView/browser engine or Node.js runtime added
+to the project.
 
 ## Tor Project
 

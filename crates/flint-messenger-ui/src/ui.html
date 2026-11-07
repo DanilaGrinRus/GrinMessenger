@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrinMessenger UI</title>
+<meta name="color-scheme" content="dark">
+<style>
+:root {
+  --bg: #07110d;
+  --bg-2: #0a1712;
+  --panel: rgba(14, 31, 25, 0.82);
+  --panel-solid: #0e1f19;
+  --line: rgba(61, 220, 151, 0.16);
+  --line-strong: rgba(61, 220, 151, 0.34);
+  --ink: #e9f7ef;
+  --muted: #9dbdae;
+  --mint: #3ddc97;
+  --mint-2: #19a974;
+  --danger: #f0a4a4;
+  --warn: #f0d08a;
+  --radius: 14px;
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(35, 150, 106, 0.22), transparent 62%),
+    radial-gradient(700px 460px at 98% 0%, rgba(61, 220, 151, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 60%, #06100c 100%);
+  background-attachment: fixed;
+}
+a { color: var(--mint); text-decoration: none; }
+a:hover { color: #8bf3c2; }
+button { font-family: inherit; }
+code, .mono { font-family: var(--mono); }
+.small { font-size: 12px; color: var(--muted); }
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(6, 15, 11, 0.82);
+  backdrop-filter: blur(10px);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .01em; }
+.brand svg { width: 28px; height: 28px; border-radius: 8px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 4px 10px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.pill.ready { color: #04140e; background: var(--mint); border-color: var(--mint); font-weight: 700; }
+.pill.ready .dot { background: #04140e; }
+.pill.tor { color: var(--warn); border-color: rgba(240, 208, 138, .5); }
+.pill.tor .dot { background: var(--warn); animation: pulse 1.2s infinite; }
+.pill.error { color: var(--danger); border-color: rgba(240, 164, 164, .55); }
+.pill.error .dot { background: var(--danger); }
+@keyframes pulse { 50% { opacity: .25; } }
+.spacer { flex: 1; }
+.btn {
+  border: 1px solid var(--line-strong); background: transparent; color: var(--ink);
+  border-radius: 10px; padding: 7px 12px; cursor: pointer; font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+.btn:hover { border-color: var(--mint); background: rgba(61, 220, 151, .08); }
+.btn.primary { background: linear-gradient(180deg, #55e7ab, var(--mint) 55%, var(--mint-2)); color: #04140e; border-color: transparent; font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.icon { padding: 4px 8px; font-family: var(--mono); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr) 300px;
+  min-height: 0;
+}
+.sidebar, .inspector {
+  border-right: 1px solid var(--line);
+  background: rgba(10, 24, 18, .55);
+  overflow-y: auto;
+  padding: 14px;
+}
+.inspector { border-right: 0; border-left: 1px solid var(--line); }
+.section-title {
+  margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.identity-card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px; background: var(--panel); margin-bottom: 16px;
+}
+.identity-card .row { display: flex; align-items: center; gap: 6px; margin: 6px 0; min-width: 0; }
+.identity-card .label { width: 52px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.identity-card .value { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.copy { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 6px; }
+.copy:hover { color: var(--mint); background: rgba(61, 220, 151, .1); }
+
+.contacts { list-style: none; margin: 0; padding: 0; }
+.contacts li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 10px; cursor: pointer;
+  border: 1px solid transparent; margin-bottom: 4px;
+}
+.contacts li:hover { background: rgba(61, 220, 151, .06); }
+.contacts li.active { border-color: var(--line-strong); background: rgba(61, 220, 151, .10); }
+.contacts .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.contacts .addr { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.contacts li.active .addr { color: #8bd9b7; }
+.contacts .del { border: 0; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; font-size: 13px; }
+.contacts li:hover .del { opacity: 1; }
+.contacts .del:hover { color: var(--danger); }
+.add-contact { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.add-contact input, .compose input, .compose textarea {
+  width: 100%; background: rgba(4, 21, 15, .7); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+  font-family: inherit; font-size: 13px; margin-bottom: 8px; outline: none;
+}
+.add-contact input:focus, .compose input:focus, .compose textarea:focus { border-color: var(--line-strong); }
+.add-contact input::placeholder, .compose input::placeholder, .compose textarea::placeholder { color: rgba(157, 189, 174, .6); }
+
+.chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-head { padding: 12px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.chat-head .peer { font-weight: 700; }
+.chat-head .peer small { color: var(--muted); font-weight: 400; font-family: var(--mono); font-size: 11px; }
+.messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 74%; border-radius: 14px; padding: 9px 12px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+.msg.out { align-self: flex-end; background: linear-gradient(180deg, rgba(61, 220, 151, .20), rgba(25, 169, 116, .14)); border-color: var(--line-strong); }
+.msg.in { align-self: flex-start; }
+.msg.selected { outline: 2px solid var(--mint); outline-offset: 2px; }
+.msg .meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+.msg .kind { border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; }
+.msg .body { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+.msg .body.slatepack { font-family: var(--mono); font-size: 11px; color: #bfe6d3; }
+.msg .peer-addr { color: var(--muted); font-family: var(--mono); font-size: 10px; margin-top: 4px; }
+.empty { color: var(--muted); text-align: center; margin: auto; padding: 30px; font-size: 13.5px; line-height: 1.7; }
+
+.compose { border-top: 1px solid var(--line); padding: 12px 18px 16px; background: rgba(6, 15, 11, .55); }
+.compose .row { display: flex; gap: 10px; }
+.compose textarea { min-height: 52px; resize: vertical; margin-bottom: 0; }
+.compose .send-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.compose .hint { flex: 1; }
+
+.inspector .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 12px; }
+.inspector dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 11.5px; }
+.inspector dt { color: var(--muted); }
+.inspector dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+.inspector .json {
+  margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px;
+  font-family: var(--mono); font-size: 10.5px; color: #bfe6d3; white-space: pre-wrap; word-break: break-all;
+  max-height: 260px; overflow-y: auto;
+}
+.inspector .empty { padding: 10px 0; text-align: left; }
+
+.statusbar {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  border-top: 1px solid var(--line); padding: 8px 18px;
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  background: rgba(6, 15, 11, .8);
+}
+.statusbar b { color: var(--ink); font-weight: 600; }
+.statusbar .err { color: var(--danger); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+
+#toast {
+  position: fixed; right: 18px; bottom: 46px; max-width: 420px;
+  border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--ink);
+  border-radius: 12px; padding: 10px 14px; font-size: 13px; box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(6px); transition: opacity .18s, transform .18s; pointer-events: none; z-index: 50;
+}
+#toast.show { opacity: 1; transform: none; }
+#toast.error { border-color: rgba(240,164,164,.6); color: var(--danger); }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 250px minmax(0, 1fr); }
+  .inspector { display: none; }
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  header { padding: 10px 12px; }
+  .messages, .compose, .chat-head { padding-left: 12px; padding-right: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7bf0b8"/><stop offset="0.45" stop-color="#3ddc97"/><stop offset="1" stop-color="#0f7a55"/>
+        </linearGradient></defs>
+        <rect width="64" height="64" rx="14" fill="url(#mg)"/>
+        <path d="M16 22c0-3.3 2.7-6 6-6h20c3.3 0 6 2.7 6 6v13c0 3.3-2.7 6-6 6H29l-8 7v-7h.2A6 6 0 0 1 16 35z" fill="#04150f"/>
+        <circle cx="32" cy="28.5" r="6.4" fill="none" stroke="#7bf0b8" stroke-width="2"/>
+        <circle cx="32" cy="28.5" r="2.2" fill="#7bf0b8"/>
+      </svg>
+      <span>GrinMessenger</span>
+    </div>
+    <span id="modePill" class="pill"><span class="dot"></span><span id="modeText">loading</span></span>
+    <span id="statusPill" class="pill"><span class="dot"></span><span id="statusText">init</span></span>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="exportBtn" title="Download transcript JSON">Export</button>
+    <button class="btn" id="refreshBtn" title="Refresh now">Refresh</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="section-title">Identity</div>
+      <div class="identity-card">
+        <div class="row"><span class="label">address</span><span class="value" id="idAddress">…</span>
+          <button class="copy" data-copy="idAddress" title="Copy address">⧉</button></div>
+        <div class="row"><span class="label">onion</span><span class="value" id="idOnion">…</span>
+          <button class="copy" data-copy="idOnion" title="Copy onion">⧉</button></div>
+        <div class="row"><span class="label">network</span><span class="value" id="idNetwork">…</span></div>
+      </div>
+
+      <div class="section-title">Contacts</div>
+      <ul class="contacts" id="contactList"></ul>
+      <div class="add-contact">
+        <input id="newName" placeholder="name (optional)" maxlength="64">
+        <input id="newAddress" placeholder="tgrin1… address" spellcheck="false">
+        <button class="btn" id="addBtn">Add contact</button>
+      </div>
+    </aside>
+
+    <section class="chat">
+      <div class="chat-head">
+        <span class="peer" id="chatPeer">All messages</span>
+        <span class="small" id="chatPeerAddr"></span>
+        <span class="spacer"></span>
+        <span class="small" id="chatCount"></span>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="compose">
+        <div class="row">
+          <div style="flex:1">
+            <input id="toInput" placeholder="recipient address (tgrin1… / grin1…)" spellcheck="false">
+            <textarea id="textInput" placeholder="Type a message… (Ctrl+Enter to send)"></textarea>
+          </div>
+        </div>
+        <div class="send-row">
+          <span class="hint small" id="sendHint">Select a contact or paste an address.</span>
+          <button class="btn primary" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <div class="section-title">Envelope inspector</div>
+      <div class="card" id="inspectorCard">
+        <div class="empty">Click a message to inspect its envelope metadata.</div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <span>poll: <b id="sbPoll">—</b></span>
+    <span>messages: <b id="sbMessages">0</b></span>
+    <span>contacts: <b id="sbContacts">0</b></span>
+    <span>transport: <b id="sbTransport">—</b></span>
+    <span class="err" id="sbError"></span>
+  </footer>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let state = null;
+let activePeer = "";
+let selectedId = "";
+let toastTimer = 0;
+
+function toast(message, isError) {
+  const el = $("toast");
+  el.textContent = message;
+  el.className = "show" + (isError ? " error" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ""; }, 4200);
+}
+
+function shortAddr(value) {
+  if (!value) return "";
+  if (value.length <= 22) return value;
+  return value.slice(0, 12) + "…" + value.slice(-6);
+}
+
+function copyFrom(id) {
+  const el = $(id);
+  const text = el ? el.textContent : "";
+  if (!text || text === "…") return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast("Copied")).catch(() => toast("Copy failed", true));
+  } else {
+    toast("Clipboard unavailable", true);
+  }
+}
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  let data = null;
+  try { data = await response.json(); } catch (error) { data = null; }
+  if (!response.ok) {
+    const message = data && data.error ? data.error : ("HTTP " + response.status);
+    throw new Error(message);
+  }
+  return data;
+}
+
+function statusPill(phase) {
+  const el = $("statusPill");
+  el.className = "pill";
+  if (phase === "ready") el.classList.add("ready");
+  else if (phase === "error") el.classList.add("error");
+  else el.classList.add("tor");
+  $("statusText").textContent = phase || "init";
+}
+
+function renderIdentity() {
+  if (!state) return;
+  const identity = state.identity || {};
+  $("idAddress").textContent = identity.address || "";
+  $("idOnion").textContent = identity.onion || "";
+  $("idNetwork").textContent = identity.network || "";
+  const mode = state.mode || {};
+  $("modePill").className = "pill";
+  $("modeText").textContent = (mode.kind || "?") + (mode.plain ? " · plain" : "") + (mode.kind === "direct" ? " · arti" : "");
+  $("sbTransport").textContent = mode.fetch_url || mode.label || "—";
+}
+
+function renderContacts() {
+  const list = $("contactList");
+  list.textContent = "";
+  const all = document.createElement("li");
+  all.className = activePeer ? "" : "active";
+  const allName = document.createElement("span");
+  allName.className = "name";
+  allName.textContent = "All messages";
+  all.appendChild(allName);
+  all.addEventListener("click", () => { activePeer = ""; $("toInput").value = ""; render(); });
+  list.appendChild(all);
+
+  (state.contacts || []).forEach((contact) => {
+    const li = document.createElement("li");
+    if (activePeer === contact.address) li.className = "active";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = contact.name;
+    const addr = document.createElement("span");
+    addr.className = "addr";
+    addr.textContent = shortAddr(contact.address);
+    const del = document.createElement("button");
+    del.className = "del";
+    del.title = "Remove contact";
+    del.textContent = "✕";
+    del.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removeContact(contact.address);
+    });
+    li.appendChild(name);
+    li.appendChild(addr);
+    li.appendChild(del);
+    li.addEventListener("click", () => {
+      activePeer = contact.address;
+      $("toInput").value = contact.address;
+      render();
+    });
+    list.appendChild(li);
+  });
+  $("sbContacts").textContent = (state.contacts || []).length;
+  $("chatPeer").textContent = activePeer
+    ? ((state.contacts || []).find((c) => c.address === activePeer) || {}).name || "Peer"
+    : "All messages";
+  $("chatPeerAddr").textContent = activePeer ? shortAddr(activePeer) : "";
+}
+
+function messageMatches(message) {
+  return !activePeer || message.peer === activePeer;
+}
+
+function renderMessages() {
+  const container = $("messages");
+  container.textContent = "";
+  const messages = (state.messages || []).filter(messageMatches);
+  $("chatCount").textContent = messages.length + " shown";
+  if (messages.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No messages here yet. Set a recipient address below, or wait for the relay/onion to deliver.";
+    container.appendChild(empty);
+    return;
+  }
+  messages.forEach((message) => {
+    const bubble = document.createElement("div");
+    bubble.className = "msg " + (message.direction === "out" ? "out" : "in");
+    if (message.id === selectedId) bubble.classList.add("selected");
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const when = document.createElement("span");
+    when.textContent = formatTime(message.created_at);
+    const kind = document.createElement("span");
+    kind.className = "kind";
+    kind.textContent = message.kind;
+    const dir = document.createElement("span");
+    dir.textContent = message.direction === "out" ? "sent" : "received";
+    meta.appendChild(when);
+    meta.appendChild(kind);
+    meta.appendChild(dir);
+    const body = document.createElement("div");
+    body.className = "body" + (message.kind === "slatepack" ? " slatepack" : "");
+    const text = message.text || "";
+    body.textContent = message.kind === "slatepack"
+      ? (text.length > 220 ? text.slice(0, 220) + "…" : text)
+      : text;
+    const peer = document.createElement("div");
+    peer.className = "peer-addr";
+    peer.textContent = message.direction === "out" ? ("to " + shortAddr(message.peer)) : ("from " + shortAddr(message.peer));
+    bubble.appendChild(meta);
+    bubble.appendChild(body);
+    bubble.appendChild(peer);
+    bubble.addEventListener("click", () => { selectedId = message.id; renderMessages(); renderInspector(); });
+    container.appendChild(bubble);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function inspectorRow(label, value) {
+  const dt = document.createElement("dt");
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  dd.textContent = value === undefined || value === null ? "—" : String(value);
+  return [dt, dd];
+}
+
+function renderInspector() {
+  const card = $("inspectorCard");
+  card.textContent = "";
+  const messages = state.messages || [];
+  const message = messages.find((m) => m.id === selectedId) || messages[messages.length - 1];
+  if (!message) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Click a message to inspect its envelope metadata.";
+    card.appendChild(empty);
+    return;
+  }
+  const dl = document.createElement("dl");
+  const rows = [
+    ["id", message.id],
+    ["direction", message.direction],
+    ["kind", message.kind],
+    ["route", message.route],
+    ["peer", shortAddr(message.peer)],
+    ["created_at", message.created_at],
+    ["ttl", message.ttl + " s"],
+    ["pow_bits", message.pow_bits],
+    ["size", (message.text || "").length + " chars (payload)"],
+  ];
+  rows.forEach(([label, value]) => inspectorRow(label, value).forEach((node) => dl.appendChild(node)));
+  card.appendChild(dl);
+  const jsonBox = document.createElement("div");
+  jsonBox.className = "json";
+  jsonBox.textContent = JSON.stringify({
+    id: message.id,
+    direction: message.direction,
+    peer: message.peer,
+    kind: message.kind,
+    created_at: message.created_at,
+    ttl: message.ttl,
+    pow_bits: message.pow_bits,
+    route: message.route,
+    note: "payload shown locally; ciphertext/signature are not exposed by this UI",
+  }, null, 2);
+  card.appendChild(jsonBox);
+}
+
+function formatTime(unix) {
+  if (!unix) return "";
+  const date = new Date(unix * 1000);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return sameDay ? time : date.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + time;
+}
+
+function renderStatus() {
+  if (!state) return;
+  const status = state.status || {};
+  statusPill(status.phase);
+  const detail = status.detail || "";
+  $("statusText").textContent = status.phase || "init";
+  $("modePill").title = detail;
+  $("sbPoll").textContent = status.last_poll_unix
+    ? new Date(status.last_poll_unix * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "—";
+  $("sbMessages").textContent = (state.counts && state.counts.messages) || 0;
+  $("sbError").textContent = status.last_error || "";
+  const sendReady = !!status.send_ready;
+  $("sendBtn").disabled = !sendReady;
+  $("sendHint").textContent = sendReady
+    ? (state.mode && state.mode.kind === "direct" ? "Direct onion: recipient must be online." : "Relay: message will be stored until the recipient fetches it.")
+    : (status.detail || "Transport is starting…");
+}
+
+function render() {
+  if (!state) return;
+  renderIdentity();
+  renderContacts();
+  renderMessages();
+  renderInspector();
+  renderStatus();
+  const to = $("toInput").value;
+  if (!to && activePeer) $("toInput").value = activePeer;
+}
+
+async function refresh() {
+  try {
+    state = await api("/api/state");
+    render();
+  } catch (error) {
+    toast("State: " + error.message, true);
+  }
+}
+
+async function sendMessage() {
+  const to = $("toInput").value.trim();
+  const text = $("textInput").value;
+  if (!to) { toast("Recipient address is required", true); $("toInput").focus(); return; }
+  if (!text.trim()) { toast("Message is empty", true); $("textInput").focus(); return; }
+  $("sendBtn").disabled = true;
+  try {
+    const result = await api("/api/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, text }),
+    });
+    $("textInput").value = "";
+    selectedId = result.id;
+    toast("Sent · " + shortAddr(to));
+    await refresh();
+  } catch (error) {
+    toast("Send: " + error.message, true);
+  } finally {
+    $("sendBtn").disabled = false;
+  }
+}
+
+async function addContact() {
+  const name = $("newName").value.trim();
+  const address = $("newAddress").value.trim();
+  if (!address) { toast("Address is required", true); return; }
+  try {
+    await api("/api/contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, address }),
+    });
+    $("newName").value = "";
+    $("newAddress").value = "";
+    toast("Contact added");
+    await refresh();
+  } catch (error) {
+    toast("Contact: " + error.message, true);
+  }
+}
+
+async function removeContact(address) {
+  try {
+    await api("/api/contacts/remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    if (activePeer === address) activePeer = "";
+    await refresh();
+  } catch (error) {
+    toast("Contact: " + error.message, true);
+  }
+}
+
+function exportTranscript() {
+  fetch("/api/export")
+    .then((response) => response.json())
+    .then((data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "grinmessenger-transcript.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast("Transcript exported");
+    })
+    .catch((error) => toast("Export: " + error.message, true));
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (target && target.dataset && target.dataset.copy) copyFrom(target.dataset.copy);
+});
+$("sendBtn").addEventListener("click", sendMessage);
+$("refreshBtn").addEventListener("click", refresh);
+$("addBtn").addEventListener("click", addContact);
+$("exportBtn").addEventListener("click", exportTranscript);
+$("toInput").addEventListener("input", (event) => {
+  const value = event.target.value.trim();
+  const contact = (state && state.contacts ? state.contacts : []).find((c) => c.address === value);
+  activePeer = contact ? contact.address : "";
+});
+$("textInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    sendMessage();
+  }
+});
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

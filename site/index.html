@@ -26,6 +26,7 @@
     <a href="#features">Features</a>
     <a href="#protocol">Protocol</a>
     <a href="#transports">Transports</a>
+    <a href="#webui">Web UI</a>
     <a href="#quickstart">Quick start</a>
     <a href="#honesty">Honesty</a>
     <a class="gh" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a>
@@ -54,6 +55,7 @@
       <div class="cta">
         <a class="btn btn-mint" href="https://github.com/DanilaGrinRus/GrinMessenger">Source code</a>
         <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">Protocol</a>
+        <a class="btn" href="#webui">Web UI</a>
         <a class="btn" href="#quickstart">Quick start</a>
       </div>
       <p class="fineprint">
@@ -129,7 +131,7 @@
     <article class="card status-card is-ready">
       <p class="status-tag">Available for testing</p>
       <h2>Build &amp; tests</h2>
-      <p>Offline build and the Rust test suite pass: 125 passed, 0 failed, 3 ignored.</p>
+      <p>Offline build and the Rust test suite pass: 127 passed, 0 failed, 3 ignored (including the web-UI integration tests).</p>
       <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
     </article>
     <article class="card status-card">
@@ -179,6 +181,13 @@
         <p><code>flintmsg keygen / address / serve / send / fetch</code> for a
           real two-peer exchange; the library exposes envelope, store, history,
           contacts and an <code>HttpConnector</code> extension point.</p>
+      </article>
+      <article class="card feature">
+        <h3>Local web UI</h3>
+        <p><code>flintmsg-ui</code> serves one embedded page over loopback: chat,
+          contacts and an envelope inspector (id, TTL, PoW bits, route, size).
+          No Node.js, no WebView2, no new dependencies; the Rust process is a
+          few megabytes and the browser is only the renderer.</p>
       </article>
       <article class="card feature">
         <h3>Honest v1 scope</h3>
@@ -263,6 +272,45 @@ GET  /flint/v1/health       {ok:true}</pre>
     </p>
   </section>
 
+  <section id="webui">
+    <p class="section-kicker">Web UI</p>
+    <h2 class="section-title">A local browser shell with an envelope inspector</h2>
+    <p class="section-note">
+      The UI is a thin shell over the same library: one Rust process serves the
+      page and a JSON API on loopback. It never adds a web backend, a browser
+      engine or a Node.js runtime to the project.
+    </p>
+    <div class="cards-2">
+      <figure class="card" style="padding:10px;margin:0">
+        <img src="assets/ui.png" alt="GrinMessenger web UI: a chat with three received messages and one reply, a contacts sidebar and an envelope inspector panel">
+        <figcaption class="small" style="padding:8px 4px 2px">
+          Live demo screenshot: relay mode on loopback, one message sent from the
+          CLI peer, one reply from the browser.
+        </figcaption>
+      </figure>
+      <div>
+        <p>
+          Chat, contacts and a per-message envelope inspector: <code>id</code>,
+          <code>ttl</code>, <code>pow_bits</code>, transport route and payload
+          size. The page also exports the transcript as JSON and shows the honest
+          transport state (<code>tor</code> / <code>ready</code> /
+          <code>error</code>) without pretending that a Tor path was verified.
+        </p>
+        <pre class="code">flintmsg-ui --data ui-data \
+  --relay http://127.0.0.1:8080 --plain
+# prints UI_URL=http://127.0.0.1:PORT/ — open it
+
+# direct mode (needs the Tor network):
+flintmsg-ui --data ui-data</pre>
+        <p class="small-note">
+          Loopback only, no authentication: it is a single-user local tool.
+          <code>history.json</code> and <code>contacts.json</code> are kept in
+          the data directory; the identity is created on first start.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <section id="quickstart">
     <p class="section-kicker">Quick start</p>
     <h2 class="section-title">Build and run in a terminal</h2>
@@ -301,6 +349,17 @@ flintmsg fetch --identity bob.json \
           <code>.onion</code> relays.</p>
       </article>
       <article class="card">
+        <h3>Web UI (loopback)</h3>
+        <pre class="code">flintmsg-ui --data ui-data \
+  --relay http://127.0.0.1:8080 --plain
+# open the printed UI_URL in a browser
+
+# or, with Tor available, direct onion:
+flintmsg-ui --data ui-data</pre>
+        <p class="small-note">Chat + contacts + envelope inspector; no
+          authentication, loopback only. Works without Tor in relay mode.</p>
+      </article>
+      <article class="card">
         <h3>Use as a library</h3>
         <pre class="code">use flint_messenger::{Identity, MessageKind, Messenger};
 use flint_messenger::transport::GatewayTransport;
@@ -326,7 +385,8 @@ let env = msg.send(&amp;id, &amp;recipient,
         <h3 class="ok">Verified</h3>
         <ul>
           <li>Offline build of the whole workspace</li>
-          <li>125 automated tests: protocol, gateway, CLI, onion vectors</li>
+          <li>127 automated tests: protocol, gateway, CLI, web UI, onion vectors</li>
+          <li>Web UI: integration tests with a real relay + live browser screenshot</li>
           <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
           <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
           <li>Independent verification: no P0–P2 defects, 9 findings fixed</li>
@@ -346,7 +406,7 @@ let env = msg.send(&amp;id, &amp;recipient,
       </article>
     </div>
     <div class="facts">
-      <div class="fact"><strong>125</strong><span>automated tests passing · 0 failed · 3 ignored</span></div>
+      <div class="fact"><strong>127</strong><span>automated tests passing · 0 failed · 3 ignored</span></div>
       <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
       <div class="fact"><strong>1</strong><span>Tor path reported as NOT VERIFIED instead of faked as a pass</span></div>
     </div>
@@ -365,7 +425,7 @@ let env = msg.send(&amp;id, &amp;recipient,
     <div class="grid grid-3">
       <article class="card">
         <h3>Source</h3>
-        <p>Rust workspace: four crates, pinned <code>Cargo.lock</code>, no vendor
+        <p>Rust workspace: five crates, pinned <code>Cargo.lock</code>, no vendor
           binaries in git.</p>
         <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a></p>
       </article>

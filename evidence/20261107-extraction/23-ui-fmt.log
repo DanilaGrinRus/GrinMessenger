@@ -1,0 +1,1 @@
+fmt --all -- --check: EXIT_CODE=0

@@ -3,13 +3,15 @@
 ## Crates
 
 ```text
-flintmsg (CLI)
-  ├── flint-messenger     envelope, crypto, PoW, ACK, store/history/contacts, transport
-  │      └── (HttpConnector trait)  ──┐
-  ├── flint-tor-arti      Arti client + onion service + onion addresses
-  │                                   │ CLI implements an Arti connector over TorHttpClient
-  └── flint-gateway       loopback gateway / standalone relay (flint-relay)
+flintmsg (CLI)  ─────┐
+flintmsg-ui (web) ───┴──► flint-messenger   envelope, crypto, PoW, ACK, store, transport
+                        ├── flint-tor-arti  Arti client + onion service + onion addresses
+                        └── flint-gateway   loopback gateway / standalone relay (flint-relay)
 ```
+
+The CLI and the web UI implement the same `HttpConnector` over
+`flint-tor-arti::TorHttpClient`; the wire format and delivery semantics do not
+depend on the shell.
 
 Dependencies are one-directional:
 
@@ -20,6 +22,9 @@ Dependencies are one-directional:
   stores envelopes; no Tor, no wallet, no external HTTP client.
 - `flint-messenger-cli` — links all three and implements `HttpConnector` over
   `flint-tor-arti::TorHttpClient` (`src/main.rs`).
+- `flint-messenger-ui` — optional local web UI: a small blocking HTTP server
+  (std `TcpListener`) with a JSON API and one embedded HTML page; it uses the
+  same library API and adds no new dependencies.
 
 ## Direct mode (primary)
 
@@ -67,6 +72,27 @@ The CLI deliberately has no persistent history/contacts: it is a demonstration
 and diagnostics tool. The library `History`/`ContactBook`/`FileMailbox` are
 available for embedding.
 
+## Web UI (`flintmsg-ui`)
+
+Single-user, loopback-only front-end. The server keeps the same runtime state as
+`serve`/`send` and exposes a small JSON API; the page is one embedded file
+(`src/ui.html`) with no external assets.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | embedded page |
+| `GET /api/state` | identity, mode, transport status, contacts, last 200 messages |
+| `POST /api/send` | `{to,text}` → sealed envelope sent through relay or direct onion |
+| `POST /api/contacts`, `POST /api/contacts/remove` | contact book (`contacts.json`) |
+| `GET /api/export` | transcript JSON (`grinmessenger-transcript-v1`) |
+| `GET /api/health` | liveness |
+
+The UI persists `history.json` and `contacts.json` in `--data`; incoming
+envelopes are stored before their signed ACK is sent. Transport startup (Arti
+bootstrap / onion service) runs in a background thread so the page is available
+immediately and shows `tor`/`ready`/`error` state. There is no authentication:
+the server binds loopback and must not be exposed.
+
 ## Trust boundaries
 
 - **Envelope**: confidentiality and integrity are provided by
@@ -77,8 +103,9 @@ available for embedding.
   payload/sender and cannot forge the signature.
 - **Tor/Arti**: transport confidentiality; the application does not rely on Tor
   for end-to-end encryption (the envelope provides it).
-- **CLI**: the identity file is a secret; stdout may contain plaintext messages —
-  that is user-facing output, not service logging.
+- **CLI/UI**: the identity file is a secret; CLI stdout and the UI page may
+  contain plaintext messages — that is user-facing output, not service logging.
+  The UI is loopback-only and has no authentication.
 
 ## Flows and resources
 
@@ -91,12 +118,16 @@ available for embedding.
 - Relay limits: TTL/quotas/sizes live in `GatewayConfig`; CLI `serve` uses
   stricter P2P limits (32 KiB payload, 30 per recipient, 12 h TTL), while
   `flint-relay` uses the relay defaults.
+- The web UI is a thin shell: one OS thread per HTTP connection, one background
+  poll thread, no async runtime of its own; it reuses the Arti runtime kept by
+  `flint-tor-arti`.
 
 ## Out of scope
 
 - Wallet, Grin node, RPC/owner API, Slatepack transactions and their automatic
   processing.
-- The Slint desktop UI and the Flint desktop lifecycle.
+- The Slint desktop wallet UI and the Flint desktop lifecycle (the separate
+  local web UI above is included).
 - Groups, attachments, ratchet/forward secrecy, offline guarantees, public abuse
   control.
 - A custom P2P protocol/network.

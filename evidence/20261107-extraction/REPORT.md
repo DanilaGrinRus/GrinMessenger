@@ -13,6 +13,7 @@ RPC и платёжной интеграции **не переносился**.
 | `flint-tor-arti` | in-process Arti: onion v3 из seed, onion service, HTTP-over-Tor | `third_party/grin-wallet/impls/src/tor/arti.rs` (Apache-2.0), `crates/core/src/onion.rs` |
 | `flint-gateway` (`flint-relay`) | standalone store-and-forward relay без кошелька | `crates/core/src/gateway.rs`, `crates/core/src/bin/flint-relay.rs` |
 | `flint-messenger-cli` (`flintmsg`) | keygen/address/serve/send/fetch | новый код; использует извлечённые крейты |
+| `flint-messenger-ui` (`flintmsg-ui`) | локальный веб-UI: чат, контакты, envelope inspector, экспорт транскрипта | новый код (2026-11-08), не извлекался из Flint |
 
 Лицензия: **MIT OR Apache-2.0** (владелец прав разрешил перелицензировать
 выделенный код; Apache-2.0-части grin-wallet сохраняют уведомления). См.
@@ -27,10 +28,10 @@ RPC и платёжной интеграции **не переносился**.
 | Сборка | offline, вендор `C:\DHW\vendor` через унаследованный `C:\DHW\.cargo\config.toml`; crates.io в окружении недоступен |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
-| Исходники | 35 `.rs`, 10 386 строк; `Cargo.lock` 556 пакетов |
-| Бинари (build output) | `target/debug/flintmsg.exe` 26.97 МБ, `target/debug/flint-relay.exe` 3.22 МБ; **в поставку не входят, пересобираются из исходников** |
+| Исходники | 37 `.rs`, 11 734 строк; `Cargo.lock` 556 пакетов; + один встроенный `ui.html` |
+| Бинари (build output) | `target/debug/flintmsg.exe` 26.97 МБ, `target/debug/flint-relay.exe` 3.26 МБ, `target/debug/flintmsg-ui.exe` 27.06 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
-| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256) |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 60 файлов |
 
 ## Проверки
 
@@ -56,23 +57,25 @@ RPC и платёжной интеграции **не переносился**.
 | 10 | Английский перевод документации + лендинг `site/` + Pages workflow; повторная сборка/тесты/fmt | **PASS**: build 64 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [15-en-site-build.log](15-en-site-build.log), [16-en-site-tests.log](16-en-site-tests.log), [17-en-site-fmt.log](17-en-site-fmt.log) |
 | 11 | GitHub Pages: деплой сайта `site/` через workflow; проверка выдачи; удаление старого сайта Flint | **PASS**: run 42383391523 = success; https://danilagrinrus.github.io/GrinMessenger/ = HTTP 200; старый https://danilagrinrus.github.io/Flint/ = HTTP 404 (Pages отключён) | [18-pages.log](18-pages.log) |
 | 12 | Flint: код убран, репозиторий переведён в архивную заглушку со ссылкой на GrinMessenger | **PASS**: в Flint остался только README.md-указатель; теги/релизы удалены, issues/projects/wiki выключены, archived=true | [19-flint-pointer.log](19-flint-pointer.log) |
+| 13 | Веб-UI: сборка, тесты (`flint-messenger-ui`), fmt | **PASS**: build EXIT 0; tests **127 passed / 0 failed / 3 ignored** (включая 2 UI интеграционных), fmt EXIT 0 | [21-ui-build.log](21-ui-build.log), [22-ui-tests.log](22-ui-tests.log), [23-ui-fmt.log](23-ui-fmt.log) |
+| 14 | Веб-UI: живое демо на loopback (relay + CLI-пир ↔ браузер), скриншот | **PASS**: 3 входящих + ответ из UI; CLI-пир получил ответ; signed ACK; история/контакты/экспорт; скриншот `docs/assets/ui.png` (1440×900) | [20-ui-demo.log](20-ui-demo.log), [20-ui-state.json](20-ui-state.json) |
 
-Итог на момент отчёта: **static/unit/build/manual loopback — PASS; live Tor —
-FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor); mock за live не
-выдаётся.**
+Итог на момент отчёта: **static/unit/build/manual loopback и веб-UI (relay/loopback) —
+PASS; live Tor — FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor);
+mock за live не выдаётся.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `2a44a12f0636aa2544bda2b7745f4e6faffb88e73d4aed76adc4798bc23c224d`
+SHA-256 — `4ff657ce371523ffd81e34cfa338787c0edbedd1a46cce59dbedb38e759b558f`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
 > Примечание о VERIFY.md: независимая верификация выполнена на pre-publication
 > freeze `487d5892…65f04` (каталог тогда назывался `FlintMessenger`). После неё
-> изменены только branding-файлы, поле `repository` в `Cargo.toml`, имена
-> каталога/репозитория, а затем добавлены английский перевод docs и `site/`;
-> **Rust-код не менялся**, повторные build/test/fmt — логи 09–17, актуальный
-> freeze-манифест — `2a44a12f…c224d`. VERIFY.md оставлен как исторический
-> артефакт.
+> изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
+> добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
+> 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
+> актуальный freeze-манифест — `4ff657ce…b558f`. VERIFY.md оставлен как
+> исторический артефакт.
 
 ### Что именно подтверждено
 
@@ -92,13 +95,16 @@ SHA-256 — `2a44a12f0636aa2544bda2b7745f4e6faffb88e73d4aed76adc4798bc23c224d`
 - **Live Tor**: результат зависит от доступности сети Tor в окружении; при
   недоступности — NOT VERIFIED/BLOCKED с логом, не PASS. Арти-клиент/сервис
   собираются и юнит-тесты проходят, но это не доказывает живой onion.
+- **Direct-режим веб-UI**: требует Tor/Arti, в этом окружении не проверялся;
+  проверен relay/loopback-режим (реальный браузер + реальный relay).
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
 - **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
   DEV/testnet-инструмент.
 - **Nostr-транспорт**: присутствует в библиотеке (перенесён), live-тест требует
-  внешний relay и по умолчанию ignored; CLI его не использует.
-- **Постоянная история/контакты в CLI**: не ведутся (библиотечные `History`/
-  `ContactBook`/`FileMailbox` доступны для встраивания).
+  внешний relay и по умолчанию ignored; CLI/UI его не используют.
+- **CLI не ведёт историю/контакты**; веб-UI сохраняет `history.json` и
+  `contacts.json` в data-каталоге (без шифрования на диске — как и остальные
+  служебные файлы UI-инструмента).
 
 ## Известные отличия от upstream (адаптация)
 

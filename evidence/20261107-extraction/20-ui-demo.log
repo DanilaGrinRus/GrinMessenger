@@ -1,0 +1,22 @@
+=== GrinMessenger Web UI demo (2026-11-08T06:25:19.8439278+07:00) ===
+relay=63935 ui=63936
+relay ready=True
+alice=tgrin1p0j58p7kmazzac2g8kt6ggvjfphpsazantq383vhqr0n2k8xqk6s4h8grf
+bob=tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0
+ui_send_ok=True id=22b2c9e4-1247-488f-881a-4f6a7b10491a
+--- bob fetch (CLI peer receives the UI reply) ---
+{"created_at":1794093923,"event":"message","from":"tgrin1p0j58p7kmazzac2g8kt6ggvjfphpsazantq383vhqr0n2k8xqk6s4h8grf","id":"22b2c9e4-1247-488f-881a-4f6a7b10491a","kind":"text","text":"Hi Bob! This reply was sent from the GrinMessenger web UI."}
+{"count":1,"event":"acked"}
+{"event":"fetched","opened":1,"source":"http://127.0.0.1:63935"}
+final: phase=ready mode=relay messages=4 contacts=1
+[472:38632:1108/062526.164:ERROR:chrome\browser\extensions\external_registry_loader_win.cc:161] File C:\Users\nurli\AppData\Roaming\kimi-desktop\webbridge-extension\chrome\fldmhceldgbpfpkbgopacenieobmligc.crx for key Software\Google\Chrome\Extensions\fldmhceldgbpfpkbgopacenieobmligc does not exist or is not readable.
+171319 bytes written to file C:\DHW\GrinMessageModule\docs\assets\ui.png
+screenshot_ok=171319_bytes
+ui_stdout:
+UI_URL=http://127.0.0.1:63936/
+ADDRESS=tgrin1p0j58p7kmazzac2g8kt6ggvjfphpsazantq383vhqr0n2k8xqk6s4h8grf
+ONION=bpsuhb6w35cc5ykihwl2iimsjbxbq5c5tlarhrmxadptkwhgaw2wtrid.onion
+MODE=relay http://127.0.0.1:63935 (plain TCP)
+DATA=C:\DHW\GrinMessageModule\.tmp-ui-demo\alice-ui
+ui_stderr_tail:
+=== done ===

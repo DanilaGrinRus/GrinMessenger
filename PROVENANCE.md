@@ -30,6 +30,7 @@ Third-party portions keep their own licenses:
 | Portion | License |
 |---|---|
 | Flint-authored code (`crates/messenger`, `gateway`, relay binary, docs, site) | MIT OR Apache-2.0 |
+| New GrinMessenger code (`crates/flint-messenger-ui`, `flint-messenger-cli`, screenshot, landing-page content) | MIT OR Apache-2.0 |
 | `flint-tor-arti` Tor integration, adapted from grin-wallet `impls/src/tor/*` | Apache-2.0 (derived from Apache-2.0 code; redistributed under Apache-2.0 and compatible with the project's MIT OR Apache-2.0 licensing) |
 | External crates (arti 0.43, tor-* 0.43, hyper, ring, …) | their own licenses, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `Cargo.lock` |
 
@@ -53,6 +54,7 @@ origin.
 | `docs/contracts/MESSENGER.md` | `docs/PROTOCOL.md` | adapted for the standalone project (wallet/slatepack auto-processing removed, translated to English) |
 | `docs/ARCHITECTURE.md`, `README.md` | `docs/ARCHITECTURE.md`, `README.md` | rewritten for the standalone project in English |
 | `site/en/index.html`, `site/styles.css`, `site/assets/logo.svg` | `site/` | landing page/design adapted for GrinMessenger (new English content and logo, same palette/layout); source assets in the same repository |
+| — (new code, 2026-11-08) | `crates/flint-messenger-ui/`, `docs/assets/ui.png`, `site/assets/ui.png` | local web UI: blocking HTTP server + embedded page, integration tests and a live demo screenshot; not copied from Flint |
 | `crates/core/address.rs`, `crates/core/tor_listener.rs`, `crates/core/tests/direct_onion.rs`, `crates/core/tests/tor_listener_gateway.rs` | — | reference only; external `tor.exe`/SOCKS path is replaced by in-process Arti |
 | `crates/core`, `crates/runtime`, `crates/slint-ui`, `crates/janus`, `crates/transfer-contract`, `third_party/grin-wallet`, `crates/grin-wallet-rpc` | — | **not extracted** (wallet, node, UI, payment and build infrastructure) |
 
@@ -77,6 +79,9 @@ origin.
    Russian as historical artifacts.
 7. Repository and project are published as **GrinMessenger**; the module's
    historical crate/binary names are unchanged.
+8. Local web UI added (2026-11-08): `crates/flint-messenger-ui` (Rust std HTTP
+   server + one embedded HTML page), integration tests, live demo screenshot and
+   a landing-page section. It adds no new external crates.
 
 ## Reproducing the provenance check
 

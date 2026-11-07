@@ -1,0 +1,82 @@
+{
+  "contacts": [
+    {
+      "address": "tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0",
+      "name": "Bob (relay)"
+    }
+  ],
+  "counts": {
+    "contacts": 1,
+    "messages": 4
+  },
+  "identity": {
+    "address": "tgrin1p0j58p7kmazzac2g8kt6ggvjfphpsazantq383vhqr0n2k8xqk6s4h8grf",
+    "network": "tgrin",
+    "onion": "bpsuhb6w35cc5ykihwl2iimsjbxbq5c5tlarhrmxadptkwhgaw2wtrid",
+    "onion_url": "http://bpsuhb6w35cc5ykihwl2iimsjbxbq5c5tlarhrmxadptkwhgaw2wtrid.onion"
+  },
+  "messages": [
+    {
+      "created_at": 1794093920,
+      "direction": "in",
+      "id": "ce2e92c2-17fc-42e4-b5c1-9a96a55b10c7",
+      "kind": "text",
+      "peer": "tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0",
+      "pow_bits": 12,
+      "route": "relay",
+      "text": "Hello! This is Bob sending through the relay.",
+      "ttl": 93600
+    },
+    {
+      "created_at": 1794093920,
+      "direction": "in",
+      "id": "34443262-9ceb-4bcc-943e-532859acc179",
+      "kind": "text",
+      "peer": "tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0",
+      "pow_bits": 12,
+      "route": "relay",
+      "text": "Envelope v1: signed, encrypted, PoW checked.",
+      "ttl": 93600
+    },
+    {
+      "created_at": 1794093921,
+      "direction": "in",
+      "id": "10aa97b3-4b59-48f0-aada-813c8ac110f9",
+      "kind": "text",
+      "peer": "tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0",
+      "pow_bits": 12,
+      "route": "relay",
+      "text": "Now you can reply from the web UI.",
+      "ttl": 93600
+    },
+    {
+      "created_at": 1794093923,
+      "direction": "out",
+      "id": "22b2c9e4-1247-488f-881a-4f6a7b10491a",
+      "kind": "text",
+      "peer": "tgrin1lw2tnq54x3zpky5s62vhxxhq2e38zd4ys4ptfh2pt34js8rrh23qks9kp0",
+      "pow_bits": 12,
+      "route": "relay",
+      "text": "Hi Bob! This reply was sent from the GrinMessenger web UI.",
+      "ttl": 93600
+    }
+  ],
+  "mode": {
+    "fetch_url": "http://127.0.0.1:63935",
+    "gateway": null,
+    "kind": "relay",
+    "label": "relay http://127.0.0.1:63935 (plain TCP)",
+    "listen": "127.0.0.1:63936",
+    "plain": true,
+    "relay": "http://127.0.0.1:63935"
+  },
+  "ok": true,
+  "status": {
+    "detail": "relay http://127.0.0.1:63935 (plain TCP)",
+    "fetch_ready": true,
+    "last_error": null,
+    "last_poll_unix": 1794093925,
+    "phase": "ready",
+    "send_ready": true
+  }
+}
