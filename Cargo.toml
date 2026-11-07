@@ -13,7 +13,7 @@ edition = "2021"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
 authors = ["DanilaGrinRus <DanilaGrinRus@users.noreply.github.com>"]
-repository = "https://github.com/DanilaGrinRus/GrinMessageModule"
+repository = "https://github.com/DanilaGrinRus/GrinMessenger"
 description = "GrinMessageModule: standalone Grin messenger over Tor/Arti (signed encrypted envelopes, direct onion delivery and store-and-forward relay); extracted from Flint messenger"
 
 [profile.dev]

@@ -1,8 +1,9 @@
 # Provenance — GrinMessageModule
 
-Публикуется как <https://github.com/DanilaGrinRus/GrinMessageModule> (2026-11-07).
-Крейты и бинари сохраняют исторические имена `flint-*` / `flintmsg` /
-`flint-relay`, чтобы происхождение выделения было однозначным.
+Публикуется как <https://github.com/DanilaGrinRus/GrinMessenger> (репозиторий
+`GrinMessenger`; проект/модуль — `GrinMessageModule`, 2026-11-07). Крейты и
+бинари сохраняют исторические имена `flint-*` / `flintmsg` / `flint-relay`,
+чтобы происхождение выделения было однозначным.
 
 ## Source
 

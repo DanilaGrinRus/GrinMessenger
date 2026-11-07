@@ -5,13 +5,14 @@
 envelope-ы, прямая доставка на Tor v3 onion через **Arti (in-process)** и
 опциональный store-and-forward relay. Без кошелька, Grin-ноды, RPC и UI.
 
-Репозиторий: <https://github.com/DanilaGrinRus/GrinMessageModule>. Крейты и
-бинари сохраняют исторические имена `flint-*` / `flintmsg` / `flint-relay` как
-provenance выделения из Flint messenger; это не часть кошелька Flint.
+Репозиторий: **GrinMessenger** — <https://github.com/DanilaGrinRus/GrinMessenger>.
+Проект/модуль: `GrinMessageModule`; крейты и бинари сохраняют исторические имена
+`flint-*` / `flintmsg` / `flint-relay` как provenance выделения из Flint
+messenger; это не часть кошелька Flint.
 
 | | |
 |---|---|
-| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessageModule> |
+| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessenger> |
 | Лицензия | MIT OR Apache-2.0 (см. `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`) |
 | Источник | Flint `20efa26a953f83a36ec0fe248e390d0031d01a95` (2026-10-30) |
 | Provenance | [PROVENANCE.md](PROVENANCE.md), [evidence/20261107-extraction](evidence/20261107-extraction/) |

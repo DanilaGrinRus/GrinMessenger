@@ -52,22 +52,24 @@ RPC и платёжной интеграции **не переносился**.
 | 6 | `cargo test -p flint-tor-arti --test live_onion -- --ignored --nocapture` (live Tor) | **FAILED, NOT VERIFIED/BLOCKED**: bootstrap timeout 300 с; в окружении нет доступа к сети Tor (dir-auth :9101 недоступен, локального SOCKS нет), при этом clearnet `1.1.1.1:443` открыт. PASS не заявляется. | [05-live-tor.log](05-live-tor.log) |
 | 7 | Чистая сборка из состава поставки (каталоги `target*`/`.tmp*` удалены) | **PASS**: `cargo build --workspace --offline --locked` 70.1 с, EXIT 0; `cargo test --workspace --offline --locked` 125 passed / 0 failed / 3 ignored, EXIT 0 | [07-clean-build.log](07-clean-build.log), [08-clean-tests.log](08-clean-tests.log) |
 | 8 | Post-rename branding (`GrinMessageModule`, `repository` в манифестах) + повторная сборка/тесты/fmt | **PASS**: build 160 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [09-rename-build.log](09-rename-build.log), [10-rename-tests.log](10-rename-tests.log), [11-rename-fmt.log](11-rename-fmt.log) |
+| 9 | Смена имени репозитория на `GrinMessenger` (URL в README/PROVENANCE/Cargo.toml) + сборка/тесты/fmt | **PASS**: build 61 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [12-repo-rename-build.log](12-repo-rename-build.log), [13-repo-rename-tests.log](13-repo-rename-tests.log), [14-repo-rename-fmt.log](14-repo-rename-fmt.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback — PASS; live Tor —
 FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor); mock за live не
 выдаётся.**
 
 Freeze-манифест кода/доков: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `11716d8ab4af90041c92aafb734bc1274544155798aa63a4f6fab4691e94bd29`
+SHA-256 — `d6bf59939acc2126810c6c3a0e5f425258eb648327a469af44fca0d760296781`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
 > Примечание о VERIFY.md: независимая верификация выполнена на pre-publication
 > freeze `487d5892…65f04` (каталог тогда назывался `FlintMessenger`). После неё
 > изменены только branding-файлы (README/PROVENANCE/NOTICE/THIRD_PARTY_NOTICES/
-> заголовки docs), поле `repository` в `Cargo.toml` и имя каталога; **код не
-> менялся**, повторные build/test/fmt — логи 09–11, новый freeze-манифест —
-> `11716d8a…4bd29`. VERIFY.md оставлен как исторический артефакт.
+> заголовки docs), поле `repository` в `Cargo.toml` и имена каталога/репозитория;
+> **код не менялся**, повторные build/test/fmt — логи 09–14, актуальный
+> freeze-манифест — `d6bf5993…96781`. VERIFY.md оставлен как исторический
+> артефакт.
 
 ### Что именно подтверждено
 
@@ -177,13 +179,13 @@ Flint не изменялся):
 
 | | |
 |---|---|
-| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessageModule> |
+| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessenger> (`GrinMessenger`; до переименования `GrinMessageModule`, старый URL редиректит) |
 | Видимость | Public |
 | Ветка по умолчанию | `main` |
 | Initial commit | `e4a2c9d3fd16c1873e8566d33bca28c207a7e136` — «Initial import: GrinMessageModule — standalone Grin messenger over Tor/Arti (extracted from Flint messenger 20efa26a)» |
 | Дата публикации | 2026-11-07 |
 | Содержимое | только выделенный модуль (исходники, docs, лицензии, evidence); без кошелька/ноды/UI, без upstream-клона и вендора |
-| Rename | проект/репозиторий = `GrinMessageModule`; крейты и бинари сохраняют имена `flint-*` / `flintmsg` / `flint-relay` как provenance |
+| Rename | проект/модуль = `GrinMessageModule`; репозиторий с 2026-11-07 = `GrinMessenger`; крейты/бинари сохраняют имена `flint-*` / `flintmsg` / `flint-relay` как provenance |
 
 После переименования код не менялся: повторные сборка/тесты/форматирование —
 логи 09–11 (PASS), новый freeze-манифест `11716d8a…4bd29`.
