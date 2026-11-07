@@ -1,0 +1,27 @@
+=== GitHub Pages: GrinMessenger site + removal of the old Flint site (2026-11-07) ===
+
+NEW SITE
+- Repository: https://github.com/DanilaGrinRus/GrinMessenger
+- Pages URL: https://danilagrinrus.github.io/GrinMessenger/
+- Pages build type: workflow (GitHub Actions), source: site/
+- Workflow: .github/workflows/pages.yml (configure-pages, upload-pages-artifact, deploy-pages)
+- Deployment run: 42383391523, status=completed, conclusion=success, sha=ef5feb6 (push to main)
+- Live check: HTTP 200 (https://danilagrinrus.github.io/GrinMessenger/ and /styles.css)
+- Repo homepage set to the Pages URL.
+- Site is English, adapted from the Flint landing page design (site/en/index.html,
+  styles.css, logo.svg); new GrinMessenger content and logo. No external CDNs/fonts.
+
+OLD FLINT SITE (removed)
+- Before: https://danilagrinrus.github.io/Flint/ (built, source branch gh-pages, legacy build)
+- API DELETE /repos/DanilaGrinRus/Flint/pages -> HTTP 422
+  "Deactivating GitHub pages for this repository is not allowed."
+- Removed the deployment source instead:
+  gh api -X DELETE repos/DanilaGrinRus/Flint/git/refs/heads/gh-pages  -> exit 0
+- Result: GitHub Pages for Flint automatically deactivated:
+  GET /repos/DanilaGrinRus/Flint/pages -> 404; repo has_pages=false; branches = [master]
+- Verification: https://danilagrinrus.github.io/Flint/ -> HTTP 404
+  "There isn't a GitHub Pages site here."
+- Flint code/content otherwise untouched (master remains); its source landing page
+  directory site/ remains in the Flint master tree and is not published anymore.
+
+Date: 2026-11-07

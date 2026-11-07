@@ -54,6 +54,7 @@ RPC и платёжной интеграции **не переносился**.
 | 8 | Post-rename branding (`GrinMessageModule`, `repository` в манифестах) + повторная сборка/тесты/fmt | **PASS**: build 160 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [09-rename-build.log](09-rename-build.log), [10-rename-tests.log](10-rename-tests.log), [11-rename-fmt.log](11-rename-fmt.log) |
 | 9 | Смена имени репозитория на `GrinMessenger` (URL в README/PROVENANCE/Cargo.toml) + сборка/тесты/fmt | **PASS**: build 61 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [12-repo-rename-build.log](12-repo-rename-build.log), [13-repo-rename-tests.log](13-repo-rename-tests.log), [14-repo-rename-fmt.log](14-repo-rename-fmt.log) |
 | 10 | Английский перевод документации + лендинг `site/` + Pages workflow; повторная сборка/тесты/fmt | **PASS**: build 64 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [15-en-site-build.log](15-en-site-build.log), [16-en-site-tests.log](16-en-site-tests.log), [17-en-site-fmt.log](17-en-site-fmt.log) |
+| 11 | GitHub Pages: деплой сайта `site/` через workflow; проверка выдачи; удаление старого сайта Flint | **PASS**: run 42383391523 = success; https://danilagrinrus.github.io/GrinMessenger/ = HTTP 200; старый https://danilagrinrus.github.io/Flint/ = HTTP 404 (Pages отключён) | [18-pages.log](18-pages.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback — PASS; live Tor —
 FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor); mock за live не

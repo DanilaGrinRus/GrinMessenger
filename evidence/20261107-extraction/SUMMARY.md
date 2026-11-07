@@ -54,6 +54,19 @@ intentionally excluded). Its SHA-256 is stored in
 - Not audited; DEV/testnet tool; no mainnet readiness claim.
 - Extraction evidence and reports are in Russian (historical artifacts).
 
+## Publication
+
+- Repository: <https://github.com/DanilaGrinRus/GrinMessenger> (public, `main`)
+- Website: <https://danilagrinrus.github.io/GrinMessenger/> (GitHub Pages,
+  deployed from `site/` by `.github/workflows/pages.yml`; run 42383391523 =
+  success, HTTP 200 verified)
+- The old Flint landing site (<https://danilagrinrus.github.io/Flint/>) was
+  removed: the GitHub Pages API refused deactivation (HTTP 422), so the
+  `gh-pages` branch was deleted, which disabled Pages automatically; the old URL
+  now returns HTTP 404. The Flint repository itself was otherwise untouched.
+- Documentation and the landing page are in English; the detailed extraction
+  report and verifier report remain in Russian as historical artifacts.
+
 ## Reproduce
 
 ```powershell
