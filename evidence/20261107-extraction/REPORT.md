@@ -170,6 +170,24 @@ VERIFIED; известных P0–P2 дефектов на замороженн�
 `C:\DHW\tmp\flint-upstream` и вендор `C:\DHW\vendor` — внешние, в поставку не
 входят.
 
+## Публикация
+
+Модуль опубликован отдельным репозиторием **вместо Flint** (сам репозиторий
+Flint не изменялся):
+
+| | |
+|---|---|
+| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessageModule> |
+| Видимость | Public |
+| Ветка по умолчанию | `main` |
+| Initial commit | `e4a2c9d3fd16c1873e8566d33bca28c207a7e136` — «Initial import: GrinMessageModule — standalone Grin messenger over Tor/Arti (extracted from Flint messenger 20efa26a)» |
+| Дата публикации | 2026-11-07 |
+| Содержимое | только выделенный модуль (исходники, docs, лицензии, evidence); без кошелька/ноды/UI, без upstream-клона и вендора |
+| Rename | проект/репозиторий = `GrinMessageModule`; крейты и бинари сохраняют имена `flint-*` / `flintmsg` / `flint-relay` как provenance |
+
+После переименования код не менялся: повторные сборка/тесты/форматирование —
+логи 09–11 (PASS), новый freeze-манифест `11716d8a…4bd29`.
+
 ## Воспроизведение
 
 ```powershell
