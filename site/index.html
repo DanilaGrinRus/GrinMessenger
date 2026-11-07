@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrinMessenger — encrypted messages for Grin over Tor/Arti</title>
+<meta name="description" content="GrinMessenger is a standalone messaging module for Grin (Mimblewimble): signed and encrypted envelopes delivered directly to a Tor v3 onion by in-process Arti, or through an optional store-and-forward relay. No wallet, no node, no UI. Rust, MIT OR Apache-2.0.">
+<meta property="og:title" content="GrinMessenger — encrypted messages for Grin over Tor/Arti">
+<meta property="og:description" content="Signed and encrypted envelopes, direct onion delivery with in-process Arti, optional relay. Rust · Tor v3 · MIT OR Apache-2.0.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://danilagrinrus.github.io/GrinMessenger/">
+<meta property="og:image" content="https://danilagrinrus.github.io/GrinMessenger/assets/logo.svg">
+<meta property="og:locale" content="en">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="#top" aria-label="GrinMessenger — home">
+    <img src="assets/logo.svg" alt="" width="34" height="34">
+    <span>GrinMessenger</span>
+  </a>
+  <nav aria-label="Main navigation">
+    <a href="#features">Features</a>
+    <a href="#protocol">Protocol</a>
+    <a href="#transports">Transports</a>
+    <a href="#quickstart">Quick start</a>
+    <a href="#honesty">Honesty</a>
+    <a class="gh" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Rust · Tor v3 · in-process Arti</p>
+      <h1>Your messages.<br><span class="grad">Your onion.</span></h1>
+      <p class="lead">
+        GrinMessenger is a standalone messaging module for Grin (Mimblewimble):
+        signed and encrypted envelopes delivered directly to a Tor v3 onion by
+        <strong>in-process Arti</strong> — or through an optional
+        store-and-forward relay. No wallet, no Grin node, no RPC and no GUI.
+      </p>
+      <p class="badges">
+        <span class="badge badge-mint">direct onion</span>
+        <span class="badge">in-process Arti</span>
+        <span class="badge">relay optional</span>
+        <span class="badge">v1: no forward secrecy</span>
+        <span class="badge">not audited</span>
+      </p>
+      <div class="cta">
+        <a class="btn btn-mint" href="https://github.com/DanilaGrinRus/GrinMessenger">Source code</a>
+        <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">Protocol</a>
+        <a class="btn" href="#quickstart">Quick start</a>
+      </div>
+      <p class="fineprint">
+        DEV/testnet tool, not audited. Live Tor could not be verified in the build
+        environment — the project says so instead of calling it a pass.
+      </p>
+    </div>
+    <figure class="shot">
+      <svg class="figure-svg" viewBox="0 0 900 700" role="img" aria-label="Direct mode: Alice sends an envelope through the Tor onion to Bob's loopback gateway; an optional relay path is shown below.">
+        <rect x="0" y="0" width="900" height="700" fill="none"/>
+        <text x="30" y="46" fill="#3ddc97" font-size="17" font-weight="700">direct mode</text>
+        <rect x="26" y="66" width="250" height="120" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
+        <text x="46" y="98" fill="#e9f7ef" font-size="16" font-weight="700">Alice · flintmsg send</text>
+        <text x="46" y="124" fill="#9dbdae" font-size="13">identity: tgrin1… (ed25519 seed)</text>
+        <text x="46" y="146" fill="#9dbdae" font-size="13">envelope v1: seal + mine_pow + sign</text>
+        <text x="46" y="168" fill="#9dbdae" font-size="13">Arti TorHttpClient</text>
+
+        <rect x="326" y="66" width="248" height="120" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)" stroke-dasharray="6 5"/>
+        <text x="346" y="98" fill="#e9f7ef" font-size="16" font-weight="700">Tor v3 onion</text>
+        <text x="346" y="124" fill="#9dbdae" font-size="13">derived from the same key</text>
+        <text x="346" y="146" fill="#9dbdae" font-size="13">Arti runs in-process —</text>
+        <text x="346" y="168" fill="#9dbdae" font-size="13">no tor.exe, no SOCKS daemon</text>
+
+        <rect x="624" y="66" width="250" height="120" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
+        <text x="644" y="98" fill="#e9f7ef" font-size="16" font-weight="700">Bob · flintmsg serve</text>
+        <text x="644" y="124" fill="#9dbdae" font-size="13">loopback gateway 127.0.0.1:P</text>
+        <text x="644" y="146" fill="#9dbdae" font-size="13">GET /flint/v1/msg → open</text>
+        <text x="644" y="168" fill="#9dbdae" font-size="13">print → signed ACK</text>
+
+        <line x1="276" y1="126" x2="326" y2="126" stroke="#3ddc97" stroke-width="2"/>
+        <polygon points="326,126 316,120 316,132" fill="#3ddc97"/>
+        <line x1="574" y1="126" x2="624" y2="126" stroke="#3ddc97" stroke-width="2"/>
+        <polygon points="624,126 614,120 614,132" fill="#3ddc97"/>
+        <text x="290" y="112" fill="#3ddc97" font-size="12" font-family="monospace">POST /flint/v1/msg</text>
+        <text x="560" y="112" fill="#3ddc97" font-size="12" font-family="monospace">onion:80 → gateway</text>
+
+        <text x="30" y="256" fill="#3ddc97" font-size="17" font-weight="700">relay mode (optional store-and-forward)</text>
+        <rect x="26" y="276" width="250" height="104" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
+        <text x="46" y="306" fill="#e9f7ef" font-size="16" font-weight="700">Alice</text>
+        <text x="46" y="332" fill="#9dbdae" font-size="13">POST opaque envelope</text>
+        <text x="46" y="354" fill="#9dbdae" font-size="13">to the relay (onion or loopback)</text>
+
+        <rect x="326" y="276" width="248" height="104" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
+        <text x="346" y="306" fill="#e9f7ef" font-size="16" font-weight="700">flint-relay</text>
+        <text x="346" y="332" fill="#9dbdae" font-size="13">TTL · quotas · PoW</text>
+        <text x="346" y="354" fill="#9dbdae" font-size="13">signed recipient ACK</text>
+
+        <rect x="624" y="276" width="250" height="104" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
+        <text x="644" y="306" fill="#e9f7ef" font-size="16" font-weight="700">Bob</text>
+        <text x="644" y="332" fill="#9dbdae" font-size="13">fetch when back online,</text>
+        <text x="644" y="354" fill="#9dbdae" font-size="13">open, print, signed ACK</text>
+
+        <line x1="276" y1="328" x2="326" y2="328" stroke="#9dbdae" stroke-width="2" stroke-dasharray="6 5"/>
+        <polygon points="326,328 316,322 316,334" fill="#9dbdae"/>
+        <line x1="574" y1="328" x2="624" y2="328" stroke="#9dbdae" stroke-width="2" stroke-dasharray="6 5"/>
+        <polygon points="624,328 614,322 614,334" fill="#9dbdae"/>
+
+        <text x="30" y="452" fill="#9dbdae" font-size="14">Envelope v1: ChaCha20-Poly1305 + ed25519 signature + HKDF-SHA256 + SHA-256 PoW.</text>
+        <text x="30" y="478" fill="#9dbdae" font-size="14">The relay cannot read the payload or forge a verifiable signature.</text>
+        <text x="30" y="504" fill="#9dbdae" font-size="14">Direct mode needs the recipient online; the relay holds opaque envelopes until TTL.</text>
+
+        <rect x="26" y="540" width="848" height="120" rx="14" fill="rgba(14,31,25,.6)" stroke="rgba(61,220,151,.2)"/>
+        <text x="46" y="572" fill="#e9f7ef" font-size="15" font-weight="700">Same protocol, different transport</text>
+        <text x="46" y="598" fill="#9dbdae" font-size="13">HttpConnector: the CLI plugs an Arti connector into flint-messenger; the gateway wire format does not change.</text>
+        <text x="46" y="620" fill="#9dbdae" font-size="13">Library transports: GatewayTransport (HTTP/+SOCKS), DirectOnionTransport, Nostr (optional, not in the CLI).</text>
+        <text x="46" y="642" fill="#9dbdae" font-size="13">No silent fallback between transports. Tor hides the path; the envelope provides end-to-end encryption.</text>
+      </svg>
+      <figcaption>GrinMessenger v0.1.0 · direct onion and relay paths</figcaption>
+    </figure>
+  </section>
+
+  <section class="status" id="status" aria-label="Project status">
+    <article class="card status-card is-ready">
+      <p class="status-tag">Available for testing</p>
+      <h2>Build &amp; tests</h2>
+      <p>Offline build and the Rust test suite pass: 125 passed, 0 failed, 3 ignored.</p>
+      <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
+    </article>
+    <article class="card status-card">
+      <p class="status-tag">Needs Tor</p>
+      <h2>Direct mode</h2>
+      <p>Recipient publishes an onion through in-process Arti; peers must be online. First bootstrap takes 30–150 s.</p>
+      <p class="mono small">flintmsg serve · flintmsg send</p>
+    </article>
+    <article class="card status-card is-soon">
+      <p class="status-tag">Works without Tor</p>
+      <h2>Relay mode</h2>
+      <p>Store-and-forward relay with TTL, quotas, PoW and signed recipient ACKs.</p>
+      <p class="mono small">flint-relay · --plain for loopback tests</p>
+    </article>
+  </section>
+
+  <section id="features">
+    <p class="section-kicker">Features</p>
+    <h2 class="section-title">What the module does</h2>
+    <div class="grid grid-3">
+      <article class="card feature">
+        <h3>Signed + encrypted envelopes</h3>
+        <p>X25519 ephemeral DH, HKDF-SHA256, ChaCha20-Poly1305 and an ed25519
+          sender signature over a domain-separated transcript. The relay is not
+          trusted for authenticity: the recipient verifies after decryption.</p>
+      </article>
+      <article class="card feature">
+        <h3>One key, two addresses</h3>
+        <p>The identity is a 32-byte ed25519 seed: the bech32 slatepack address
+          and the Tor v3 onion are derived from it. No separate identity,
+          directory or onion registration is needed.</p>
+      </article>
+      <article class="card feature">
+        <h3>In-process Arti</h3>
+        <p>The onion service and outbound HTTP run inside the process through
+          Arti 0.43 — no <code>tor.exe</code>, no Tor Expert Bundle, no external
+          SOCKS daemon. Bridge lines remain configurable.</p>
+      </article>
+      <article class="card feature">
+        <h3>Relay without a wallet</h3>
+        <p><code>flint-relay</code> stores only opaque envelopes: TTL, per-recipient
+          and global quotas, rate limiting, proof of work, signed ACKs. No wallet
+          endpoint is reachable through it.</p>
+      </article>
+      <article class="card feature">
+        <h3>CLI demo + library</h3>
+        <p><code>flintmsg keygen / address / serve / send / fetch</code> for a
+          real two-peer exchange; the library exposes envelope, store, history,
+          contacts and an <code>HttpConnector</code> extension point.</p>
+      </article>
+      <article class="card feature">
+        <h3>Honest v1 scope</h3>
+        <p>No groups, attachments or ratchet; no forward secrecy yet; no offline
+          guarantees in direct mode. These are stated limits, not hidden
+          surprises.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="protocol">
+    <p class="section-kicker">Protocol</p>
+    <h2 class="section-title">Envelope v1 and the gateway API</h2>
+    <p class="section-note">
+      The wire format is preserved from Flint messenger v1 and covered by fixed
+      test vectors. Full contract: <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">docs/PROTOCOL.md</a>.
+    </p>
+    <div class="table-wrap">
+      <table class="api">
+        <thead><tr><th scope="col">Envelope field</th><th scope="col">Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>version</code></td><td>u8, currently 1</td></tr>
+          <tr><td><code>id</code></td><td>UUID, delivery and ACK identifier</td></tr>
+          <tr><td><code>recipient</code></td><td>bech32 address of the recipient</td></tr>
+          <tr><td><code>created_at / ttl</code></td><td>Unix seconds / lifetime in seconds</td></tr>
+          <tr><td><code>ephemeral_key</code></td><td>32-byte X25519 public key of the sender</td></tr>
+          <tr><td><code>nonce / ciphertext</code></td><td>ChaCha20-Poly1305 message</td></tr>
+          <tr><td><code>pow_nonce / pow_bits</code></td><td>Proof of work (0 for legacy envelopes)</td></tr>
+          <tr><td><code>signature</code></td><td>64-byte ed25519 sender signature</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cards-2" style="margin-top:18px">
+      <article class="card">
+        <h3>Gateway API</h3>
+        <pre class="code">POST /flint/v1/msg          {id,to,payload,ttl_secs}
+GET  /flint/v1/msg?to=…     messages (opaque payloads)
+POST /flint/v1/msg/&lt;id&gt;/ack signed recipient ACK
+GET  /flint/v1/health       {ok:true}</pre>
+        <p class="small-note">At-least-once delivery; the same signed envelope is
+          retried with the same id. TTL is enforced twice: by the mailbox and by
+          the recipient.</p>
+      </article>
+      <article class="card">
+        <h3>Crypto path</h3>
+        <pre class="code">seed ──SHA-512──► X25519 scalar ──DH──► HKDF-SHA256
+     ──► ChaCha20-Poly1305 (AAD binds header)
+     ──► ed25519 signature (transcript)
+     ──► SHA-256 PoW (spam limit only)</pre>
+        <p class="small-note">No custom cryptography: ready-made,
+          reviewed libraries only. PoW is spam control, not proof of identity.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="transports">
+    <p class="section-kicker">Transports</p>
+    <h2 class="section-title">Direct onion or relay — your choice</h2>
+    <div class="two-col">
+      <article class="card list-card">
+        <h3 class="ok">Direct onion (primary)</h3>
+        <ul>
+          <li>Recipient starts a loopback gateway and publishes an onion via Arti.</li>
+          <li>Sender posts the envelope to <code>http://&lt;onion&gt;.onion/flint/v1/msg</code>.</li>
+          <li>Recipient fetches from its own gateway, opens, prints and signs the ACK.</li>
+          <li>No third party stores the message; recipient must be online.</li>
+        </ul>
+      </article>
+      <article class="card list-card">
+        <h3 class="ok">Relay (offline delivery)</h3>
+        <ul>
+          <li><code>flint-relay</code> stores opaque envelopes until TTL (default 26 h, max 7 days).</li>
+          <li>PoW, quotas and rate limits protect the relay; ACKs are signed by the recipient.</li>
+          <li>Works over Arti <code>.onion</code> or plain loopback for tests.</li>
+          <li>The relay can drop/duplicate messages and sees metadata — never the plaintext.</li>
+        </ul>
+      </article>
+    </div>
+    <p class="callout">
+      No silent fallback: the transport is an explicit choice. Direct delivery is
+      peer-to-peer; relay delivery trades metadata for store-and-forward.
+    </p>
+  </section>
+
+  <section id="quickstart">
+    <p class="section-kicker">Quick start</p>
+    <h2 class="section-title">Build and run in a terminal</h2>
+    <div class="cards-2">
+      <article class="card">
+        <h3>Build (offline dev environment)</h3>
+        <pre class="code">git clone https://github.com/DanilaGrinRus/GrinMessenger
+cd GrinMessenger
+cargo build --workspace
+cargo test  --workspace</pre>
+        <p class="small-note">Rust MSVC, <code>rust-version = "1.92"</code>.
+          The project builds offline with a vendor directory; on a normal machine
+          dependencies are fetched from crates.io.</p>
+      </article>
+      <article class="card">
+        <h3>Direct mode (needs Tor)</h3>
+        <pre class="code">flintmsg keygen --out alice.json
+flintmsg keygen --out bob.json
+flintmsg address --identity bob.json
+flintmsg serve --identity bob.json --data bob-data
+flintmsg send --identity alice.json \
+  --to &lt;bob address&gt; --text "hello over arti"</pre>
+        <p class="small-note"><code>serve</code> prints JSON lines; each message is
+          acknowledged with a signed ACK after printing.</p>
+      </article>
+      <article class="card">
+        <h3>Relay mode (no Tor needed)</h3>
+        <pre class="code">flint-relay --listen 127.0.0.1:8080 --store relay-store
+flintmsg send --identity alice.json \
+  --to &lt;bob address&gt; --text "hi" \
+  --relay http://127.0.0.1:8080 --plain
+flintmsg fetch --identity bob.json \
+  --source http://127.0.0.1:8080 --plain</pre>
+        <p class="small-note"><code>--plain</code> disables Tor for loopback/clearnet
+          tests; without it the CLI goes through Arti and supports
+          <code>.onion</code> relays.</p>
+      </article>
+      <article class="card">
+        <h3>Use as a library</h3>
+        <pre class="code">use flint_messenger::{Identity, MessageKind, Messenger};
+use flint_messenger::transport::GatewayTransport;
+
+let id = Identity::from_seed(seed, "tgrin")?;
+let msg = Messenger::new(
+    GatewayTransport::new("http://127.0.0.1:8080")?);
+let env = msg.send(&amp;id, &amp;recipient,
+    MessageKind::Text { text: "hi".into() },
+    DEFAULT_TTL_SECS)?;</pre>
+        <p class="small-note">For Arti delivery, implement
+          <code>HttpConnector</code> over <code>TorHttpClient</code> (the CLI does
+          exactly that).</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="honesty">
+    <p class="section-kicker">Development honesty</p>
+    <h2 class="section-title">What works, what does not, and how it is checked</h2>
+    <div class="two-col">
+      <article class="card list-card">
+        <h3 class="ok">Verified</h3>
+        <ul>
+          <li>Offline build of the whole workspace</li>
+          <li>125 automated tests: protocol, gateway, CLI, onion vectors</li>
+          <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
+          <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
+          <li>Independent verification: no P0–P2 defects, 9 findings fixed</li>
+          <li>Provenance and license audit against upstream commit</li>
+        </ul>
+      </article>
+      <article class="card list-card">
+        <h3 class="no">Not verified / not included</h3>
+        <ul>
+          <li>Live Tor: Arti bootstrap timed out — network unreachable here</li>
+          <li>Direct-mode CLI against a real onion</li>
+          <li>Live Nostr transport (needs an external relay)</li>
+          <li>Forward secrecy, groups, attachments</li>
+          <li>Security audit; mainnet use</li>
+          <li>Persistent history/contacts in the CLI</li>
+        </ul>
+      </article>
+    </div>
+    <div class="facts">
+      <div class="fact"><strong>125</strong><span>automated tests passing · 0 failed · 3 ignored</span></div>
+      <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
+      <div class="fact"><strong>1</strong><span>Tor path reported as NOT VERIFIED instead of faked as a pass</span></div>
+    </div>
+    <p class="callout">
+      Reports, logs and hashes live in the repository under
+      <code>evidence/20261107-extraction/</code>. The extraction report and the
+      independent verifier report are kept in Russian as historical artifacts;
+      <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/evidence/20261107-extraction/SUMMARY.md">SUMMARY.md</a>
+      provides the English overview.
+    </p>
+  </section>
+
+  <section id="repository">
+    <p class="section-kicker">Repository</p>
+    <h2 class="section-title">Code, docs and evidence</h2>
+    <div class="grid grid-3">
+      <article class="card">
+        <h3>Source</h3>
+        <p>Rust workspace: four crates, pinned <code>Cargo.lock</code>, no vendor
+          binaries in git.</p>
+        <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a></p>
+      </article>
+      <article class="card">
+        <h3>Docs</h3>
+        <p>Protocol, architecture, provenance, third-party notices and build
+          instructions.</p>
+        <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">Protocol</a>
+           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/ARCHITECTURE.md">Architecture</a></p>
+      </article>
+      <article class="card">
+        <h3>Evidence</h3>
+        <p>Build/test logs, loopback E2E transcript, freeze manifest, extraction
+          report and independent verification.</p>
+        <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/tree/main/evidence/20261107-extraction">Evidence</a></p>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="foot-brand">
+    <img src="assets/logo.svg" alt="" width="26" height="26">
+    <span>GrinMessenger</span>
+  </div>
+  <p>MIT OR Apache-2.0 · code and evidence on
+    <a href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a> ·
+    not audited, DEV/testnet only</p>
+  <p class="fineprint">© 2026 GrinMessenger. Extracted from the Flint project; crates keep historical <code>flint-*</code> names as provenance. No third-party trademarks are used.</p>
+</footer>
+
+</body>
+</html>

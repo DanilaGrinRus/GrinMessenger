@@ -1,103 +1,112 @@
-# GrinMessageModule
+# GrinMessenger
 
-Самостоятельный модуль мессенджера, выделенный из проекта
-[Flint](https://github.com/DanilaGrinRus/Flint): подписанные и зашифрованные
-envelope-ы, прямая доставка на Tor v3 onion через **Arti (in-process)** и
-опциональный store-and-forward relay. Без кошелька, Grin-ноды, RPC и UI.
+Standalone Grin messenger module, extracted from the
+[Flint](https://github.com/DanilaGrinRus/Flint) project: signed and encrypted
+envelope messages, direct delivery to a Tor v3 onion through **in-process Arti**,
+and an optional store-and-forward relay. No wallet, no Grin node, no RPC and no
+GUI are required.
 
-Репозиторий: **GrinMessenger** — <https://github.com/DanilaGrinRus/GrinMessenger>.
-Проект/модуль: `GrinMessageModule`; крейты и бинари сохраняют исторические имена
-`flint-*` / `flintmsg` / `flint-relay` как provenance выделения из Flint
-messenger; это не часть кошелька Flint.
+Repository: <https://github.com/DanilaGrinRus/GrinMessenger> ·
+Website: <https://danilagrinrus.github.io/GrinMessenger/>
+
+The crates and binaries keep their historical `flint-*` / `flintmsg` /
+`flint-relay` names as provenance of the extraction from the Flint messenger;
+this is not the Flint wallet.
 
 | | |
 |---|---|
-| Репозиторий | <https://github.com/DanilaGrinRus/GrinMessenger> |
-| Лицензия | MIT OR Apache-2.0 (см. `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`) |
-| Источник | Flint `20efa26a953f83a36ec0fe248e390d0031d01a95` (2026-10-30) |
+| Repository | <https://github.com/DanilaGrinRus/GrinMessenger> |
+| Website | <https://danilagrinrus.github.io/GrinMessenger/> |
+| License | MIT OR Apache-2.0 (see `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`) |
+| Upstream | Flint `20efa26a953f83a36ec0fe248e390d0031d01a95` (2026-10-30) |
 | Provenance | [PROVENANCE.md](PROVENANCE.md), [evidence/20261107-extraction](evidence/20261107-extraction/) |
-| Протокол | [docs/PROTOCOL.md](docs/PROTOCOL.md) |
-| Архитектура | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Сторонние компоненты | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
+| Protocol | [docs/PROTOCOL.md](docs/PROTOCOL.md) |
+| Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
-Статус (2026-11-07): **извлечение и адаптация выполнены; offline-сборка PASS,
-125 автотестов PASS (0 failed, 3 ignored), loopback e2e и реальные процессы CLI
-PASS. Live Tor — FAILED/NOT VERIFIED: в этом окружении Arti не завершил bootstrap
-за 300 с (сеть Tor недоступна); это не выдаётся за PASS.** Подробности —
-[evidence/20261107-extraction/REPORT.md](evidence/20261107-extraction/REPORT.md).
-Это DEV/testnet-инструмент, не аудированный и не готовый к mainnet.
+Status (2026-11-07): **extraction and adaptation are complete; offline build is
+PASS, 125 automated tests are PASS (0 failed, 3 ignored), the loopback E2E and
+real CLI processes are PASS. Live Tor is FAILED / NOT VERIFIED: in the build
+environment Arti did not finish bootstrap within 300 s because the Tor network is
+unreachable. This is not reported as a pass.** See
+[evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
+and [REPORT.md](evidence/20261107-extraction/REPORT.md) (the detailed extraction
+report and verifier logs are kept in Russian as historical evidence).
+This is a DEV/testnet tool: not audited, not ready for mainnet.
 
-## Крейты
+## Crates
 
-| Крейт | Бинарь | Что делает |
+| Crate | Binary | What it does |
 |---|---|---|
-| `flint-messenger` | — | envelope v1, crypto, PoW, ACK, store/history/contacts, транспорты (`GatewayTransport`, `DirectOnionTransport`, Nostr) |
-| `flint-tor-arti` | — | in-process Tor: onion v3 из ed25519 seed, onion service, HTTP-клиент через Arti |
-| `flint-gateway` | `flint-relay` | loopback gateway / standalone relay без кошелька |
-| `flint-messenger-cli` | `flintmsg` | two-peer CLI: keygen/address/serve/send/fetch |
+| `flint-messenger` | — | envelope v1, crypto, PoW, ACK, store/history/contacts, transports (`GatewayTransport`, `DirectOnionTransport`, Nostr) |
+| `flint-tor-arti` | — | in-process Tor: onion v3 from the ed25519 seed, onion service, HTTP client through Arti |
+| `flint-gateway` | `flint-relay` | loopback gateway / standalone store-and-forward relay without a wallet |
+| `flint-messenger-cli` | `flintmsg` | two-peer CLI: keygen / address / serve / send / fetch |
 
-## Сборка
+## Build
 
-Нужен Rust MSVC (edition 2021, `rust-version = "1.92"`; проверено на 1.99).
+Rust for MSVC is required (edition 2021, `rust-version = "1.92"`; verified with
+1.99).
 
 ```powershell
 cargo build --workspace
 cargo test --workspace
 ```
 
-Этот workspace лежит внутри `C:\DHW`, где унаследованный
-`C:\DHW\.cargo\config.toml` заменяет crates.io на offline-вендор
-`C:\DHW\vendor` — поэтому сборка проходит без сети. На другой машине просто
-`cargo build` подтянет зависимости из crates.io по `Cargo.lock`; для полностью
-offline-сборки перенесите вендор и `.cargo/config.toml` рядом с проектом.
+The repository is developed inside `C:\DHW`, where the inherited
+`C:\DHW\.cargo\config.toml` replaces crates.io with the offline vendor at
+`C:\DHW\vendor`, so the build works without network access. On another machine,
+plain `cargo build` will fetch the pinned dependencies from `Cargo.lock`; for a
+fully offline build, copy the vendor directory and a `.cargo/config.toml` next to
+the project.
 
-`profile.dev` использует `debug = 0` (MSVC choking на длинных путях зависимостей).
-Release-сборка: `cargo build --release --workspace`.
+`profile.dev` sets `debug = 0` (MSVC chokes on long paths in the dependency
+graph). Release build: `cargo build --release --workspace`.
 
-## Быстрый старт: direct mode (Tor/Arti)
+## Quick start: direct mode (Tor/Arti)
 
-Нужна сеть Tor (Arti bootstrap; первый запуск может занять 30–150 с). Оба
-участника должны быть online — direct-доставка не хранит сообщения вне
-получателя. Для запуска без Tor см. relay mode ниже.
+A Tor network connection is required (Arti bootstrap; the first run can take
+30–150 s). Both peers must be online: direct delivery stores nothing outside the
+recipient. For a run without Tor, see relay mode below.
 
 ```powershell
-# 1) идентичности (seed-файлы; НЕ публиковать)
+# 1) identities (seed files; do NOT publish them)
 cargo run -p flint-messenger-cli --bin flintmsg -- keygen --out alice.json
 cargo run -p flint-messenger-cli --bin flintmsg -- keygen --out bob.json
 cargo run -p flint-messenger-cli --bin flintmsg -- address --identity bob.json
 # { "address": "tgrin1…", "onion": "….onion" }
 
-# 2) Bob поднимает onion + loopback gateway и печатает входящие JSON-строки
+# 2) Bob publishes the onion + loopback gateway and prints incoming JSON lines
 cargo run -p flint-messenger-cli --bin flintmsg -- serve --identity bob.json --data bob-data
 
-# 3) Alice отправляет на адрес Bob (onion выводится из адреса)
+# 3) Alice sends to Bob's address (the onion is derived from the address)
 cargo run -p flint-messenger-cli --bin flintmsg -- send --identity alice.json `
   --to tgrin1… --text "hello over arti"
 ```
 
-`serve` печатает `{"event":"ready",…}` и затем `{"event":"message",…}` для
-каждого сообщения; после печати сообщение подтверждается signed ACK. Первый
-Arti bootstrap клиента/сервиса может занять до 150 с (таймаут настраивается в
-коде `flint-tor-arti`).
+`serve` prints `{"event":"ready",…}` and then one `{"event":"message",…}` line
+per message; after printing, the message is acknowledged with a signed ACK. The
+first Arti bootstrap of the client/service can take up to 150 s (the timeout is
+configurable in `flint-tor-arti`).
 
 ## Relay mode (store-and-forward)
 
 ```powershell
-# relay (loopback для теста; на практике публикуйте через onion)
+# relay (loopback for testing; publish it through an onion in production)
 cargo run -p flint-gateway --bin flint-relay -- --listen 127.0.0.1:8080 --store relay-store
 
-# отправка и приём через relay; --plain = TCP без Tor (только loopback/clearnet)
+# send and receive through the relay; --plain = TCP without Tor (loopback/clearnet only)
 cargo run -p flint-messenger-cli --bin flintmsg -- send --identity alice.json `
   --to tgrin1… --text "hi via relay" --relay http://127.0.0.1:8080 --plain
 cargo run -p flint-messenger-cli --bin flintmsg -- fetch --identity bob.json `
   --source http://127.0.0.1:8080 --plain
 ```
 
-Без `--plain` CLI ходит через Arti и умеет `.onion`-relay. `flint-relay`
-включает `require_pow` и `require_signed_ack`; сообщения — opaque envelope-ы,
-relay не видит plaintext.
+Without `--plain`, the CLI goes through Arti and can use a `.onion` relay.
+`flint-relay` enables `require_pow` and `require_signed_ack`; messages are opaque
+envelopes, so the relay cannot read the plaintext.
 
-## Использование как библиотеки
+## Using it as a library
 
 ```rust
 use flint_messenger::{Address, Identity, MessageKind, Messenger, DEFAULT_TTL_SECS};
@@ -115,44 +124,43 @@ let envelope = messenger.send(
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Для доставки через Arti реализуйте
-`flint_messenger::transport::HttpConnector` поверх
-`flint_tor_arti::TorHttpClient` (ровно так делает `flintmsg`) и передайте его в
-`GatewayTransport::with_connector` / `DirectOnionTransport::with_connector`.
-Для внешнего Tor с SOCKS5 сохранены `GatewayTransport::with_socks` и
-`DirectOnionTransport::new`.
+To deliver through Arti, implement `flint_messenger::transport::HttpConnector`
+on top of `flint_tor_arti::TorHttpClient` (this is what `flintmsg` does) and pass
+it to `GatewayTransport::with_connector` / `DirectOnionTransport::with_connector`.
+For an external Tor with SOCKS5, `GatewayTransport::with_socks` and
+`DirectOnionTransport::new` are preserved.
 
-## Проверки
+## Checks
 
 ```powershell
-cargo test --workspace                     # unit + integration (без live Tor)
-cargo test -p flint-tor-arti --test live_onion -- --ignored   # нужна сеть Tor
-cargo test -p flint-gateway --test relay_live -- --ignored    # spawn flint-relay
+cargo test --workspace                                      # unit + integration, no live Tor
+cargo test -p flint-tor-arti --test live_onion -- --ignored  # needs the Tor network
+cargo test -p flint-gateway --test relay_live -- --ignored    # spawns flint-relay
 ```
 
-Результаты прогонов (команды, PASS/FAIL, live Tor NOT VERIFIED при недоступной
-сети) — в [evidence/20261107-extraction/](evidence/20261107-extraction/).
-Сводка: `cargo build --workspace --offline --locked` — PASS;
+Run results (commands, PASS/FAIL, live Tor NOT VERIFIED when the network is
+unavailable) are in [evidence/20261107-extraction/](evidence/20261107-extraction/).
+Summary: `cargo build --workspace --offline --locked` — PASS;
 `cargo test --workspace --offline --locked` — 125 passed / 0 failed / 3 ignored
-(пишутся: `relay_live`, live-Nostr, `live_onion`); `cargo fmt --check` — PASS.
+(`relay_live`, live Nostr, `live_onion`); `cargo fmt --check` — PASS.
 
-## Что не входит
+## Not included
 
-- Кошелёк, Grin-нода, owner/foreign API, Slatepack-транзакции и их автоматическая
-  обработка (S1/S2).
-- Slint UI/desktop-приложение Flint, iOS-клиент.
-- Группы, вложения, ratchet/forward secrecy, гарантированная offline-доставка,
-  публичный abuse-control и собственный P2P-протокол.
-- Nostr-транспорт присутствует в библиотеке как отдельный вариант, но CLI v1 его
-  не включает.
+- Wallet, Grin node, owner/foreign API, Slatepack transactions and their
+  automatic processing (S1/S2).
+- The Flint desktop Slint UI and the iOS client.
+- Groups, attachments, ratchet/forward secrecy, guaranteed offline delivery,
+  public abuse control and a custom P2P protocol.
+- The Nostr transport exists in the library as a separate delivery option, but
+  the v1 CLI does not enable it.
 
-## Ограничения и честные утверждения
+## Limitations and honest claims
 
-- Протокол v1 не даёт forward secrecy и защиты после компрометации ключа.
-- Relay/direct видят метаданные (адрес получателя, размер, время); relay не
-  читает payload, но может удалять/дублировать сообщения.
-- Tor скрывает сетевой маршрут, но не является заменой end-to-end шифрования —
-  оно обеспечивается envelope-ом.
-- Проект не заявляет анонимность, отсутствие ошибок или готовность к mainnet.
-- CLI не ведёт постоянную историю/контакты: это демонстрационный инструмент;
-  библиотечные `History`, `ContactBook`, `FileMailbox` доступны для встраивания.
+- Protocol v1 has no forward secrecy and no post-compromise protection.
+- Relay/direct delivery exposes metadata (recipient address, size, time); the
+  relay cannot read the payload, but it can drop or duplicate messages.
+- Tor hides the network path but is not a replacement for end-to-end
+  encryption — the envelope provides that.
+- The project does not claim anonymity, absence of bugs or mainnet readiness.
+- The CLI keeps no persistent history/contacts: it is a demonstration tool; the
+  library `History`, `ContactBook` and `FileMailbox` are available for embedding.

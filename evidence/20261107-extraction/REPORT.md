@@ -53,22 +53,23 @@ RPC и платёжной интеграции **не переносился**.
 | 7 | Чистая сборка из состава поставки (каталоги `target*`/`.tmp*` удалены) | **PASS**: `cargo build --workspace --offline --locked` 70.1 с, EXIT 0; `cargo test --workspace --offline --locked` 125 passed / 0 failed / 3 ignored, EXIT 0 | [07-clean-build.log](07-clean-build.log), [08-clean-tests.log](08-clean-tests.log) |
 | 8 | Post-rename branding (`GrinMessageModule`, `repository` в манифестах) + повторная сборка/тесты/fmt | **PASS**: build 160 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [09-rename-build.log](09-rename-build.log), [10-rename-tests.log](10-rename-tests.log), [11-rename-fmt.log](11-rename-fmt.log) |
 | 9 | Смена имени репозитория на `GrinMessenger` (URL в README/PROVENANCE/Cargo.toml) + сборка/тесты/fmt | **PASS**: build 61 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [12-repo-rename-build.log](12-repo-rename-build.log), [13-repo-rename-tests.log](13-repo-rename-tests.log), [14-repo-rename-fmt.log](14-repo-rename-fmt.log) |
+| 10 | Английский перевод документации + лендинг `site/` + Pages workflow; повторная сборка/тесты/fmt | **PASS**: build 64 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [15-en-site-build.log](15-en-site-build.log), [16-en-site-tests.log](16-en-site-tests.log), [17-en-site-fmt.log](17-en-site-fmt.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback — PASS; live Tor —
 FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor); mock за live не
 выдаётся.**
 
-Freeze-манифест кода/доков: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `d6bf59939acc2126810c6c3a0e5f425258eb648327a469af44fca0d760296781`
+Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
+SHA-256 — `2a44a12f0636aa2544bda2b7745f4e6faffb88e73d4aed76adc4798bc23c224d`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
 > Примечание о VERIFY.md: независимая верификация выполнена на pre-publication
 > freeze `487d5892…65f04` (каталог тогда назывался `FlintMessenger`). После неё
-> изменены только branding-файлы (README/PROVENANCE/NOTICE/THIRD_PARTY_NOTICES/
-> заголовки docs), поле `repository` в `Cargo.toml` и имена каталога/репозитория;
-> **код не менялся**, повторные build/test/fmt — логи 09–14, актуальный
-> freeze-манифест — `d6bf5993…96781`. VERIFY.md оставлен как исторический
+> изменены только branding-файлы, поле `repository` в `Cargo.toml`, имена
+> каталога/репозитория, а затем добавлены английский перевод docs и `site/`;
+> **Rust-код не менялся**, повторные build/test/fmt — логи 09–17, актуальный
+> freeze-манифест — `2a44a12f…c224d`. VERIFY.md оставлен как исторический
 > артефакт.
 
 ### Что именно подтверждено

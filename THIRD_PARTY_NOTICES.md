@@ -1,10 +1,10 @@
 # Third-party notices
 
-GrinMessageModule is licensed under **MIT OR Apache-2.0** (see
+GrinMessenger is licensed under **MIT OR Apache-2.0** (see
 [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)). This file lists
 the third-party components whose code or data is redistributed or required by
-the project. `Cargo.lock` is the authoritative version inventory; this text is
-a summary, not a replacement for upstream license texts.
+the project. `Cargo.lock` is the authoritative version inventory; this text is a
+summary, not a replacement for upstream license texts.
 
 ## Grin wallet — Apache-2.0
 
@@ -18,10 +18,9 @@ a summary, not a replacement for upstream license texts.
 - License: Apache License 2.0. The adapted files retain the Apache-2.0
   attribution in their headers; the Grin wallet `LICENSE` text is the upstream
   Apache-2.0 text.
-- The adapted code was relicensed by the Flint copyright holder only for
-  Flint-authored portions; Apache-2.0 portions remain Apache-2.0 and are
-  redistributed here under Apache-2.0 (compatible with the project's
-  `MIT OR Apache-2.0` terms).
+- The Flint copyright holder relicensed only the Flint-authored portions;
+  Apache-2.0 portions remain Apache-2.0 and are redistributed here under
+  Apache-2.0 (compatible with the project's `MIT OR Apache-2.0` terms).
 
 ## Arti / Tor crates — MIT OR Apache-2.0
 
@@ -49,14 +48,27 @@ MIT / Apache-2.0 / BSD / ISC). Notable direct dependencies:
 - `secp256k1 0.33` — MIT (Nostr transport).
 - `tungstenite 0.30`, `rustls 0.23` — MIT / Apache-2.0 (Nostr WebSocket
   transport).
-- `hyper 1`, `hyper-util`, `http-body-util`, `bytes` — MIT (Artia HTTP client
+- `hyper 1`, `hyper-util`, `http-body-util`, `bytes` — MIT (Arti HTTP client
   plumbing).
-- `serde`, `serde_json`, `uuid`, `thiserror`, `getrandom`, `zeroize`,
-  `bech32`, `data-encoding`, `base64` — MIT OR Apache-2.0.
+- `serde`, `serde_json`, `uuid`, `thiserror`, `getrandom`, `zeroize`, `bech32`,
+  `data-encoding`, `base64` — MIT OR Apache-2.0.
 
-The full license inventory can be generated from `Cargo.lock` with
-`cargo license` / `cargo deny` on a machine with registry access; the vendored
-offline build used for the evidence run does not include a license scanner.
+The full license inventory can be generated from `Cargo.lock` with `cargo
+license` / `cargo deny` on a machine with registry access; the vendored offline
+build used for the evidence run does not include a license scanner. Before a
+public release, run `cargo deny`/`cargo about`. Note that some transitive crates
+are dual/ tri-licensed (for example `priority-queue` is `LGPL-3.0-or-later OR
+MPL-2.0`, `r-efi` is `MIT OR Apache-2.0 OR LGPL-2.1-or-later`); the MIT/Apache/MPL
+options are the selectable ones, and no GPL-only dependency is used.
+
+## Landing page
+
+The landing page under `site/` is adapted from the Flint project's own landing
+page (`site/en/index.html`, `site/styles.css`, `site/assets/logo.svg`) with new
+content and a new logo for GrinMessenger. Flint-authored material was relicensed
+by the copyright holder under MIT OR Apache-2.0 (see `PROVENANCE.md`). No
+external fonts, CDNs or third-party scripts are used; the page is fully
+self-contained.
 
 ## Tor Project
 

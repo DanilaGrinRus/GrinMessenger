@@ -1,0 +1,66 @@
+# Extraction summary (English)
+
+Quick English summary of the extraction and its verification. The detailed
+historical reports are kept in Russian: [REPORT.md](REPORT.md) (extraction
+report) and [VERIFY.md](VERIFY.md) (independent verification), with raw logs in
+[verify-raw/](verify-raw/).
+
+## What was extracted
+
+From the public [Flint](https://github.com/DanilaGrinRus/Flint) repository,
+commit `20efa26a953f83a36ec0fe248e390d0031d01a95` (2026-10-30), the messenger
+component was extracted into this standalone workspace:
+
+| Crate | Purpose |
+|---|---|
+| `flint-messenger` | envelope v1, crypto, PoW, ACK, store/history/contacts, transports |
+| `flint-tor-arti` | in-process Arti: onion v3 service from the ed25519 seed, HTTP over Tor |
+| `flint-gateway` (`flint-relay`) | standalone store-and-forward relay without a wallet |
+| `flint-messenger-cli` (`flintmsg`) | two-peer CLI: keygen/address/serve/send/fetch |
+
+Wallet, Grin node, RPC, payment/Slatepack automation and the Slint UI were **not**
+extracted. License: MIT OR Apache-2.0 (owner authorization; Apache-2.0 parts of
+grin-wallet keep their own license). Full file mapping:
+[PROVENANCE.md](../../PROVENANCE.md).
+
+## Verification result
+
+| Check | Result |
+|---|---|
+| Offline build (`cargo build --workspace --offline --locked`) | **PASS** (exit 0) |
+| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 125 passed, 0 failed, 3 ignored |
+| `cargo fmt --check` | **PASS** |
+| Ignored `relay_live` test (spawns the real `flint-relay` process) | **PASS**, 1 passed |
+| Two-process loopback E2E (`flint-relay` + `flintmsg keygen/send/fetch`) | **PASS**: delivery, open, signed ACK, empty re-fetch, offline send fails |
+| Independent verification (separate agent, own build dir) | **PASS**, no P0–P2 defects; 9 findings fixed and re-checked |
+| Live Tor (onion service through Arti) | **FAILED / NOT VERIFIED / BLOCKED**: Arti bootstrap timed out after 300 s; the Tor network is unreachable in the build environment. Not reported as a pass. |
+
+The 3 ignored tests are: `relay_live` (run explicitly and PASS), the live Nostr
+test (needs an external relay) and `live_onion` (needs the Tor network).
+
+## Freeze manifest
+
+The delivered source tree is pinned by
+[source-sha256.sha256](source-sha256.sha256) (54 files: crates, Cargo manifests,
+docs, site, GitHub workflow, README, licenses, notices; `evidence/` is
+intentionally excluded). Its SHA-256 is stored in
+[source-sha256.sha256.hash](source-sha256.sha256.hash).
+`upstream-sources.sha256` pins the 40 upstream files used by the extraction.
+
+## Known limitations
+
+- Live Tor/direct-onion CLI is unverified in this environment.
+- No forward secrecy, no groups/attachments, no offline guarantee.
+- Not audited; DEV/testnet tool; no mainnet readiness claim.
+- Extraction evidence and reports are in Russian (historical artifacts).
+
+## Reproduce
+
+```powershell
+Set-Location C:\DHW\GrinMessageModule
+$env:TMP = "C:\DHW\GrinMessageModule\.tmp-build"; $env:TEMP = $env:TMP
+$env:CARGO_TARGET_DIR = "C:\DHW\GrinMessageModule\target"
+cargo build --workspace --offline --locked
+cargo test  --workspace --offline --locked
+cargo test -p flint-gateway --test relay_live --offline -- --ignored --test-threads=1
+```
