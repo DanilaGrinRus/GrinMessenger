@@ -59,6 +59,7 @@ RPC и платёжной интеграции **не переносился**.
 | 12 | Flint: код убран, репозиторий переведён в архивную заглушку со ссылкой на GrinMessenger | **PASS**: в Flint остался только README.md-указатель; теги/релизы удалены, issues/projects/wiki выключены, archived=true | [19-flint-pointer.log](19-flint-pointer.log) |
 | 13 | Веб-UI: сборка, тесты (`flint-messenger-ui`), fmt | **PASS**: build EXIT 0; tests **127 passed / 0 failed / 3 ignored** (включая 2 UI интеграционных), fmt EXIT 0 | [21-ui-build.log](21-ui-build.log), [22-ui-tests.log](22-ui-tests.log), [23-ui-fmt.log](23-ui-fmt.log) |
 | 14 | Веб-UI: живое демо на loopback (relay + CLI-пир ↔ браузер), скриншот | **PASS**: 3 входящих + ответ из UI; CLI-пир получил ответ; signed ACK; история/контакты/экспорт; скриншот `docs/assets/ui.png` (1440×900) | [20-ui-demo.log](20-ui-demo.log), [20-ui-state.json](20-ui-state.json) |
+| 15 | GitHub Pages: редеплой сайта с секцией Web UI и скриншотом | **PASS**: run 42425449844 = success (sha e2d4ae6); https://danilagrinrus.github.io/GrinMessenger/ = HTTP 200, секция «Web UI» и `assets/ui.png` на месте | [24-pages-ui.log](24-pages-ui.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback и веб-UI (relay/loopback) —
 PASS; live Tor — FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor);

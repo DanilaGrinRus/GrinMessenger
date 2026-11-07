@@ -1,0 +1,9 @@
+=== GitHub Pages redeploy after adding the web UI (2026-11-08) ===
+- Commit: e2d4ae6 (Add local web UI: chat, contacts, envelope inspector, tests, demo screenshot and site section)
+- Pages workflow run 42425449844: status=completed, conclusion=success, sha=e2d4ae6
+- Site: https://danilagrinrus.github.io/GrinMessenger/ (HTTP 200 verified)
+- New section: "Web UI — a local browser shell with an envelope inspector"
+  with screenshot site/assets/ui.png (171 319 bytes, identical to docs/assets/ui.png)
+- Web UI crate: crates/flint-messenger-ui (Rust std HTTP server + embedded ui.html)
+- Tests: 127 passed / 0 failed / 3 ignored (including 2 UI integration tests)
+- Demo: evidence/20-ui-demo.log + 20-ui-state.json (relay loopback, CLI peer <-> browser)
