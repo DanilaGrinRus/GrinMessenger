@@ -1,0 +1,22 @@
+=== Two-process loopback demo (final build): flint-relay + flintmsg ===
+date: 2026-11-07T19:11:46.1665784+07:00
+relay port: 62176
+relay ready: True
+--- keygen ---
+{"address":"tgrin1erfnawhudcajcks7ad9jmamaelwna9c0r04708e9v03xr4kmegys2kf40a","event":"keygen","identity":"C:\\DHW\\FlintMessenger\\.tmp-demo\\alice.json","network":"tgrin","onion":"zdjt5ox4ny5sywq65nfs3535z7ot5fypdpv6phzfmprgdvw3zietpvad"}
+{"address":"tgrin1lctqcgrantmx3ep4ta3sm5n9t9tmjdl3twkujy5xvvnmr2wvhc0svx74a8","event":"keygen","identity":"C:\\DHW\\FlintMessenger\\.tmp-demo\\bob.json","network":"tgrin","onion":"7ylayid5tl3grzbvl5rq3utflfl3sn7rlow4seugmmt3dkomxyp3h4yd"}
+--- bob address ---
+{"address":"tgrin1lctqcgrantmx3ep4ta3sm5n9t9tmjdl3twkujy5xvvnmr2wvhc0svx74a8","event":"address","onion":"7ylayid5tl3grzbvl5rq3utflfl3sn7rlow4seugmmt3dkomxyp3h4yd","onion_url":"http://7ylayid5tl3grzbvl5rq3utflfl3sn7rlow4seugmmt3dkomxyp3h4yd.onion"}
+--- alice send (relay, --plain) ---
+{"event":"sent","id":"0bc6c80a-bcec-4c22-bd9c-9d91220e2970","remote":"http://127.0.0.1:62176","to":"tgrin1lctqcgrantmx3ep4ta3sm5n9t9tmjdl3twkujy5xvvnmr2wvhc0svx74a8","via":"relay"}
+--- bob fetch #1 ---
+{"created_at":1794053506,"event":"message","from":"tgrin1erfnawhudcajcks7ad9jmamaelwna9c0r04708e9v03xr4kmegys2kf40a","id":"0bc6c80a-bcec-4c22-bd9c-9d91220e2970","kind":"text","text":"hello from flintmsg demo"}
+{"count":1,"event":"acked"}
+{"event":"fetched","opened":1,"source":"http://127.0.0.1:62176"}
+--- bob fetch #2 (acked message must be gone) ---
+{"count":0,"event":"acked"}
+{"event":"fetched","opened":0,"source":"http://127.0.0.1:62176"}
+--- offline relay: send must fail ---
+flintmsg: send: хранилище: gateway: connect: Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение. (os error 10061)
+offline send exit code: 1
+DEMO DONE

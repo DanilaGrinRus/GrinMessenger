@@ -1,0 +1,4 @@
+TIME=2026-11-07T19:13:55.3935110+07:00
+CMD: cargo fmt --all -- --check
+TMP=C:\DHW\FlintMessenger\.tmp-verify CARGO_TARGET_DIR=C:\DHW\FlintMessenger\target-verify
+EXIT_CODE=0 ELAPSED_SEC=0.2

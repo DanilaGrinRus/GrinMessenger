@@ -1,0 +1,8 @@
+TIME=2026-11-07T19:13:55.6201505+07:00
+CMD: cargo build --workspace --offline --locked
+TMP=C:\DHW\FlintMessenger\.tmp-verify CARGO_TARGET_DIR=C:\DHW\FlintMessenger\target-verify
+   Compiling flint-messenger v0.1.0 (C:\DHW\FlintMessenger\crates\flint-messenger)
+   Compiling flint-gateway v0.1.0 (C:\DHW\FlintMessenger\crates\flint-gateway)
+   Compiling flint-messenger-cli v0.1.0 (C:\DHW\FlintMessenger\crates\flint-messenger-cli)
+    Finished `dev` profile [unoptimized] target(s) in 4.25s
+EXIT_CODE=0 ELAPSED_SEC=4.3

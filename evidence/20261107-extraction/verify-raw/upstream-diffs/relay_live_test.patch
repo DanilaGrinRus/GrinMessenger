@@ -1,0 +1,28 @@
+diff --git "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\tests\\relay_live.rs" "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\tests\\relay_live.rs"
+index 8a72c62..2254809 100644
+--- "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\tests\\relay_live.rs"
++++ "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\tests\\relay_live.rs"
+@@ -1,9 +1,11 @@
++// SPDX-License-Identifier: MIT OR Apache-2.0
+ //! Live local-relay smoke: the real `flint-relay` process, opaque envelopes,
+ //! broken-envelope quarantine and restart-style skip.
+ //!
+-//! Run with:
+-//!   cargo build -p flint-core --bin flint-relay
+-//!   cargo test -p flint-messenger --test relay_live -- --ignored --test-threads=1
++//! The binary is located through Cargo's `CARGO_BIN_EXE_<name>`, so no build
++//! path is hard-coded:
++//!
++//!   cargo test -p flint-gateway --test relay_live -- --ignored --test-threads=1
+ 
+ use std::collections::HashSet;
+ use std::net::{TcpListener, TcpStream};
+@@ -22,7 +24,7 @@ fn free_port() -> u16 {
+ }
+ 
+ fn relay_exe() -> std::path::PathBuf {
+-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/flint-relay.exe")
++    std::path::PathBuf::from(env!("CARGO_BIN_EXE_flint-relay"))
+ }
+ 
+ fn wait_ready(port: u16, timeout: Duration) {

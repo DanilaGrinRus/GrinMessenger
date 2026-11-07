@@ -1,0 +1,6 @@
+TIME=2026-11-07T19:17:13.9495149+07:00
+manifest=C:\DHW\FlintMessenger\evidence\20261107-extraction\upstream-sources.sha256 sha256=e3e4bb42735b5192d408da4af7ac8d01cc4ff21daf6ba6457e11c9ae4c31193a
+upstream_root=C:\DHW\tmp\flint-upstream
+upstream_head=20efa26a953f83a36ec0fe248e390d0031d01a95
+upstream_dirty=False
+entries=40 ok=40 bad=0 missing=0

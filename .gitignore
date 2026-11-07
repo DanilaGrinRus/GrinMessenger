@@ -1,0 +1,7 @@
+# Build artifacts and local scratch. Evidence is tracked on purpose.
+/target*/
+/tmp*/
+/.tmp*/
+*.pdb
+*.exe
+*.dll

@@ -1,0 +1,6 @@
+TIME=2026-11-07T19:17:13.8425974+07:00
+manifest=C:\DHW\FlintMessenger\evidence\20261107-extraction\source-sha256.sha256
+manifest_sha256=487d58926a7a66d67011047a72f784449d287cb3c0b231a75b0b70dc14865f04
+manifest_hash_file=487d58926a7a66d67011047a72f784449d287cb3c0b231a75b0b70dc14865f04  source-sha256.sha256
+entries=50 ok=50 bad=0 missing=0
+MATCH_HASH_FILE=True

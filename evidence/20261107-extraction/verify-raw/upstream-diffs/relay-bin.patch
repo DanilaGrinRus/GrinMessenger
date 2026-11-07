@@ -1,0 +1,51 @@
+diff --git "a/C:\\DHW\\tmp\\flint-upstream\\crates\\core\\src\\bin\\flint-relay.rs" "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\src\\bin\\flint-relay.rs"
+index 7424099..98e466c 100644
+--- "a/C:\\DHW\\tmp\\flint-upstream\\crates\\core\\src\\bin\\flint-relay.rs"
++++ "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\src\\bin\\flint-relay.rs"
+@@ -1,13 +1,15 @@
++// SPDX-License-Identifier: MIT OR Apache-2.0
+ //! Standalone store-and-forward relay.
+ //!
+ //! It has no wallet at all: only opaque messenger envelopes, quotas, TTL and
+ //! signed recipient acks. Bind it to loopback and publish it through a Tor
+-//! hidden service (see docs/OPERATIONS.md), or put a TLS reverse proxy in front of
+-//! it. Never expose this plaintext listener to the public internet.
++//! hidden service (with an onion service pointing at this local port), or put a
++//! TLS reverse proxy in front of it. Never expose this plaintext listener to the
++//! public internet.
+ 
+ use std::path::PathBuf;
+ 
+-use flint_core::gateway::{wait_ready, Gateway, GatewayConfig};
++use flint_gateway::{wait_ready, Gateway, GatewayConfig};
+ 
+ fn usage() -> &'static str {
+     "flint-relay [options]
+@@ -20,8 +22,8 @@ fn usage() -> &'static str {
+   --help
+ 
+ Messages are opaque signed+encrypted envelopes. The relay cannot decrypt the
+-payload or the sender address, but it can verify a known sender candidate against
+-the public signature. Recipient acks must be signed."
++payload or the sender address. Recipient acks must be signed and envelopes must
++carry a valid proof of work."
+ }
+ 
+ fn main() {
+@@ -66,7 +68,6 @@ fn main() {
+ 
+     let gateway = Gateway::start(GatewayConfig {
+         bind,
+-        wallet_proxy: false,
+         require_signed_ack: true,
+         require_pow: true,
+         store_dir: Some(store.clone()),
+@@ -83,7 +84,7 @@ fn main() {
+     println!("flint-relay listening on {}", gateway.url());
+     println!("store: {}", store.display());
+     println!("ttl: {ttl}s, per-recipient: {max_per}, total: {max_total}");
+-    println!("signed acks: required");
++    println!("signed acks: required, proof of work: required");
+     println!("Publish this listener through Tor; do not expose it as plain HTTP.");
+ 
+     loop {

@@ -1,0 +1,12 @@
+=== relay_live (final binaries) ===
+   Compiling flint-messenger v0.1.0 (C:\DHW\FlintMessenger\crates\flint-messenger)
+   Compiling flint-gateway v0.1.0 (C:\DHW\FlintMessenger\crates\flint-gateway)
+    Finished `test` profile [unoptimized] target(s) in 2.41s
+     Running tests\relay_live.rs (target\debug\deps\relay_live-1f8057a4d558d201.exe)
+
+running 1 test
+test local_relay_quarantines_broken_envelopes_and_restart_skips_them ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.57s
+
+EXIT_CODE=0

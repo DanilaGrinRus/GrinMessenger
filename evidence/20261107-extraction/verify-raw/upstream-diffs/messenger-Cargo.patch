@@ -1,0 +1,66 @@
+diff --git "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\Cargo.toml" "b/C:\\DHW\\FlintMessenger\\crates\\flint-messenger\\Cargo.toml"
+index 86c8d27..2ebed00 100644
+--- "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\Cargo.toml"
++++ "b/C:\\DHW\\FlintMessenger\\crates\\flint-messenger\\Cargo.toml"
+@@ -4,36 +4,32 @@ version.workspace = true
+ edition.workspace = true
+ rust-version.workspace = true
+ license.workspace = true
+-description = "Flint messenger M1: signed, encrypted slatepack envelopes over an abstract transport"
++description = "Signed, encrypted envelope protocol over an abstract transport"
+ 
+ [dependencies]
+-serde = { workspace = true }
+-serde_json = { workspace = true }
+-thiserror = { workspace = true }
+-uuid = { workspace = true }
+-bech32 = { workspace = true }
+-sha2 = { workspace = true }
+-sha3 = { workspace = true }
+-data-encoding = { workspace = true }
+-ed25519-dalek = { workspace = true }
+-x25519-dalek = { workspace = true }
+-curve25519-dalek = { workspace = true }
+-chacha20poly1305 = { workspace = true }
+-chacha20 = { workspace = true }
+-# History-key wrapper v2: Argon2id (see docs/contracts/MESSENGER.md).
+-argon2 = { workspace = true }
+-hkdf = { workspace = true }
+-getrandom = { workspace = true }
+-base64 = { workspace = true }
+-zeroize = { workspace = true }
++serde = { version = "1", features = ["derive"] }
++serde_json = "1"
++thiserror = "2"
++uuid = { version = "1", features = ["v4", "serde"] }
++bech32 = "0.7"
++sha2 = "0.10"
++sha3 = "0.10"
++data-encoding = "2"
++ed25519-dalek = "2"
++x25519-dalek = { version = "2", features = ["static_secrets"] }
++curve25519-dalek = "4"
++chacha20poly1305 = "0.9"
++chacha20 = "0.8"
++# History-key wrapper v2: Argon2id (see docs/PROTOCOL.md).
++argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
++hkdf = "0.12"
++getrandom = "0.2"
++base64 = "0.13"
++zeroize = "1"
+ ring = "0.17"
+ # Nostr transport: BIP-340 signatures, x-only ECDH for NIP-44.
+-secp256k1 = { workspace = true }
+-hmac = { workspace = true }
+-tungstenite = { workspace = true }
+-url = { workspace = true }
+-rustls = { workspace = true }
+-
+-
+-
+-
++secp256k1 = { version = "0.33", features = ["rand"] }
++hmac = "0.12"
++tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
++url = "2"
++rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

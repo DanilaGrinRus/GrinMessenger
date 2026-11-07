@@ -1,0 +1,18 @@
+diff --git "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\src\\lib.rs" "b/C:\\DHW\\FlintMessenger\\crates\\flint-messenger\\src\\lib.rs"
+index 265b626..e6505e2 100644
+--- "a/C:\\DHW\\tmp\\flint-upstream\\crates\\messenger\\src\\lib.rs"
++++ "b/C:\\DHW\\FlintMessenger\\crates\\flint-messenger\\src\\lib.rs"
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: MIT OR Apache-2.0
+ //! Flint messenger — M1 protocol.
+ //!
+ //! The wallet already has an identity: the slatepack address is an ed25519
+@@ -39,7 +40,7 @@ pub use keywrap::{
+ };
+ pub use nostr::{ContactDirectory, NostrKeys, NostrTransport, RelayFilter, WsRelay};
+ pub use store::{FailedEnvelope, MemoryMailbox, Messenger, ReceiveBatch, Store, Transport};
+-pub use transport::{DirectOnionTransport, GatewayTransport};
++pub use transport::{DirectOnionTransport, GatewayTransport, HttpConnector, TcpConnector};
+ 
+ /// Default message lifetime: 26 hours (a slate survives ~24h, plus delivery).
+ pub const DEFAULT_TTL_SECS: u64 = 26 * 60 * 60;

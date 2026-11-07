@@ -1,0 +1,394 @@
+diff --git "a/C:\\DHW\\tmp\\flint-upstream\\crates\\core\\src\\gateway.rs" "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\src\\gateway.rs"
+index 94323b9..acccf1d 100644
+--- "a/C:\\DHW\\tmp\\flint-upstream\\crates\\core\\src\\gateway.rs"
++++ "b/C:\\DHW\\FlintMessenger\\crates\\flint-gateway\\src\\gateway.rs"
+@@ -1,12 +1,11 @@
+-//! Local wallet gateway **or** standalone store-and-forward relay.
++// SPDX-License-Identifier: MIT OR Apache-2.0
++//! Standalone store-and-forward relay for opaque messenger envelopes.
+ //!
+-//! With `wallet_proxy = true` one onion per wallet serves payments and messages:
+-//!
+-//! * `POST /v2/foreign` → the running `grin-wallet` foreign API (payments),
+-//! * `/flint/v1/msg*`   → store-and-forward messenger envelopes.
+-//!
+-//! With `wallet_proxy = false` the same message API runs without any wallet —
+-//! that is [`flint-relay`](../bin/flint-relay.rs) for offline recipients.
++//! This is the relay half of the Flint messenger, extracted from the wallet
++//! core: there is no wallet, no payment RPC proxy and no external HTTP client.
++//! It serves only `/flint/v1/msg*` (store/fetch/ack) and `/flint/v1/health`, so
++//! recipients can be reached while offline, for example through a Tor onion
++//! service in front of the loopback listener.
+ //!
+ //! Messenger payloads are **opaque signed+encrypted envelopes** produced by
+ //! `flint-messenger`. The gateway deliberately does not receive the sender
+@@ -18,8 +17,7 @@
+ //! * message ids are UUIDs; ack requires the same recipient address;
+ //! * public relays require a signed recipient proof bound to the message id;
+ //! * per-recipient and global queue quotas;
+-//! * TTL clamped to the gateway maximum; expired records purged;
+-//! * only `/v2/foreign` is proxied when a wallet is enabled.
++//! * TTL clamped to the gateway maximum; expired records purged.
+ 
+ use std::collections::HashMap;
+ use std::io::{Read, Write};
+@@ -32,10 +30,18 @@ use std::time::{Duration, Instant};
+ use serde::{Deserialize, Serialize};
+ use serde_json::{json, Value};
+ 
+-use flint_messenger::{ack::MAX_SKEW_SECS, AckProof};
++use flint_messenger::transport::{HttpConnector, TcpConnector};
++use flint_messenger::{ack::MAX_SKEW_SECS, AckProof, Address};
+ 
+-use crate::address::onion_from_address;
+-use crate::error::{FlintError, Result};
++use crate::error::{Error, Result};
++
++/// Current wall-clock time in Unix milliseconds (the store wire unit).
++fn now_millis() -> i64 {
++    std::time::SystemTime::now()
++        .duration_since(std::time::UNIX_EPOCH)
++        .map(|duration| duration.as_millis() as i64)
++        .unwrap_or(0)
++}
+ 
+ const MAX_REQUEST: usize = 160 * 1024;
+ const MAX_PAYLOAD: usize = 64 * 1024;
+@@ -59,11 +65,7 @@ pub struct GatewayConfig {
+     /// Loopback address to bind. A public relay normally binds loopback behind
+     /// Tor; a reverse proxy may choose another address.
+     pub bind: SocketAddr,
+-    /// `true` for the wallet gateway (payments + messages); `false` for a
+-    /// standalone store-and-forward relay that must not touch a wallet.
+-    pub wallet_proxy: bool,
+-    /// Where `grin-wallet` serves its foreign API (loopback).
+-    pub wallet_foreign_url: String,
++
+     /// Directory for message files; empty = memory only.
+     pub store_dir: Option<PathBuf>,
+     /// Public relays should require a signed recipient ack, otherwise anyone
+@@ -83,8 +85,6 @@ impl Default for GatewayConfig {
+     fn default() -> Self {
+         Self {
+             bind: "127.0.0.1:0".parse().expect("gateway bind"),
+-            wallet_proxy: true,
+-            wallet_foreign_url: "http://127.0.0.1:3425/v2/foreign".into(),
+             store_dir: None,
+             require_signed_ack: false,
+             require_pow: false,
+@@ -104,7 +104,6 @@ struct State {
+     /// independent from the message-count quota: a flood of tiny messages must
+     /// not be able to churn the queue faster than normal delivery.
+     posts: Mutex<HashMap<String, (Instant, u32)>>,
+-    http: reqwest::blocking::Client,
+     active: AtomicUsize,
+ }
+ 
+@@ -116,14 +115,10 @@ pub struct Gateway {
+ 
+ impl Gateway {
+     pub fn start(config: GatewayConfig) -> Result<Self> {
+-        let listener = TcpListener::bind(config.bind).map_err(FlintError::Io)?;
+-        let addr = listener.local_addr().map_err(FlintError::Io)?;
+-        listener.set_nonblocking(true).map_err(FlintError::Io)?;
+-
+-        let http = reqwest::blocking::Client::builder()
+-            .timeout(Duration::from_secs(30))
+-            .build()
+-            .map_err(|e| FlintError::Wallet(format!("gateway http: {e}")))?;
++        let listener = TcpListener::bind(config.bind).map_err(Error::Io)?;
++        let addr = listener.local_addr().map_err(Error::Io)?;
++        listener.set_nonblocking(true).map_err(Error::Io)?;
++
+         // A relay restart must not forget persisted messages: POST quotas are
+         // checked against this map before the first GET. Loading lazily made a
+         // restarted relay accept over-quota posts (audit PT-03).
+@@ -148,7 +143,6 @@ impl Gateway {
+             config,
+             messages: Mutex::new(messages),
+             posts: Mutex::new(HashMap::new()),
+-            http,
+             active: AtomicUsize::new(0),
+         });
+         let running = Arc::new(AtomicBool::new(true));
+@@ -225,34 +219,16 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
+         .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+     stream
+         .set_read_timeout(Some(Duration::from_secs(15)))
+-        .map_err(FlintError::Io)?;
++        .map_err(Error::Io)?;
+     stream
+         .set_write_timeout(Some(Duration::from_secs(15)))
+-        .map_err(FlintError::Io)?;
++        .map_err(Error::Io)?;
+ 
+     let (method, path, body) = read_request(&mut stream)?;
+     let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+     let route = path.split('?').next().unwrap_or("").to_string();
+ 
+     match (method.as_str(), route.as_str()) {
+-        ("POST", "/v2/foreign") if !state.config.wallet_proxy => write_response(
+-            &mut stream,
+-            404,
+-            "application/json",
+-            b"{\"error\":\"relay has no wallet\"}",
+-        ),
+-        ("POST", "/v2/foreign") => {
+-            let response = state
+-                .http
+-                .post(&state.config.wallet_foreign_url)
+-                .header(reqwest::header::CONTENT_TYPE, "application/json")
+-                .body(body)
+-                .send()
+-                .map_err(|e| FlintError::Wallet(format!("gateway → wallet: {e}")))?;
+-            let status = response.status().as_u16();
+-            let text = response.text().unwrap_or_default();
+-            write_response(&mut stream, status, "application/json", text.as_bytes())
+-        }
+         ("POST", "/flint/v1/msg") => {
+             if body.len() > state.config.max_payload {
+                 return write_response(
+@@ -276,7 +252,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
+             let to = value.get("to").and_then(Value::as_str).unwrap_or("");
+             let id = value.get("id").and_then(Value::as_str).unwrap_or("");
+             let payload = value.get("payload").and_then(Value::as_str).unwrap_or("");
+-            if onion_from_address(to).is_err() {
++            if Address::parse(to).is_err() {
+                 return write_response(
+                     &mut stream,
+                     400,
+@@ -358,7 +334,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
+         }
+         ("GET", "/flint/v1/msg") => {
+             let to = query_param(query, "to").unwrap_or_default();
+-            if onion_from_address(&to).is_err() {
++            if Address::parse(&to).is_err() {
+                 return write_response(
+                     &mut stream,
+                     400,
+@@ -402,7 +378,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
+             }
+             let value: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+             let to = value.get("to").and_then(Value::as_str).unwrap_or("");
+-            if onion_from_address(to).is_err() {
++            if Address::parse(to).is_err() {
+                 return write_response(
+                     &mut stream,
+                     400,
+@@ -420,7 +396,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
+                 );
+             }
+             if let Some(proof) = proof.as_ref() {
+-                let now = chrono::Utc::now().timestamp().max(0) as u64;
++                let now = flint_messenger::envelope::unix_now();
+                 let valid = proof.to == to
+                     && proof.id == id
+                     && proof.ts.abs_diff(now) <= MAX_SKEW_SECS
+@@ -493,7 +469,7 @@ fn store(
+     if !allow_post_with(state, to, state.config.max_posts_per_minute) {
+         return Err(PutError::Quota);
+     }
+-    let now = chrono::Utc::now().timestamp_millis();
++    let now = now_millis();
+     let mut guard = state
+         .messages
+         .lock()
+@@ -532,7 +508,7 @@ fn store(
+ const MAX_LIST_BYTES: usize = 2 * 1024 * 1024;
+ 
+ fn list(state: &State, to: &str, limit: usize) -> std::result::Result<Vec<Message>, PutError> {
+-    let now = chrono::Utc::now().timestamp_millis();
++    let now = now_millis();
+     let mut guard = state
+         .messages
+         .lock()
+@@ -647,15 +623,13 @@ fn read_request(stream: &mut TcpStream) -> Result<(String, String, Vec<u8>)> {
+     let mut chunk = [0u8; 4096];
+     let header_end;
+     loop {
+-        let read = stream.read(&mut chunk).map_err(FlintError::Io)?;
++        let read = stream.read(&mut chunk).map_err(Error::Io)?;
+         if read == 0 {
+-            return Err(FlintError::Invalid("gateway: пустой запрос".into()));
++            return Err(Error::Invalid("gateway: пустой запрос".into()));
+         }
+         buffer.extend_from_slice(&chunk[..read]);
+         if buffer.len() > MAX_REQUEST {
+-            return Err(FlintError::Invalid(
+-                "gateway: запрос слишком большой".into(),
+-            ));
++            return Err(Error::Invalid("gateway: запрос слишком большой".into()));
+         }
+         if let Some(pos) = find(&buffer, b"\r\n\r\n") {
+             header_end = pos + 4;
+@@ -675,18 +649,18 @@ fn read_request(stream: &mut TcpStream) -> Result<(String, String, Vec<u8>)> {
+         .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+         .unwrap_or(0);
+     if length > MAX_REQUEST {
+-        return Err(FlintError::Invalid("gateway: тело слишком большое".into()));
++        return Err(Error::Invalid("gateway: тело слишком большое".into()));
+     }
+ 
+     let mut body = buffer[header_end..].to_vec();
+     while body.len() < length {
+-        let read = stream.read(&mut chunk).map_err(FlintError::Io)?;
++        let read = stream.read(&mut chunk).map_err(Error::Io)?;
+         if read == 0 {
+             break;
+         }
+         body.extend_from_slice(&chunk[..read]);
+         if body.len() > MAX_REQUEST {
+-            return Err(FlintError::Invalid("gateway: тело слишком большое".into()));
++            return Err(Error::Invalid("gateway: тело слишком большое".into()));
+         }
+     }
+     body.truncate(length);
+@@ -713,9 +687,9 @@ fn write_response(
+         "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+         body.len()
+     );
+-    stream.write_all(head.as_bytes()).map_err(FlintError::Io)?;
+-    stream.write_all(body).map_err(FlintError::Io)?;
+-    stream.flush().map_err(FlintError::Io)
++    stream.write_all(head.as_bytes()).map_err(Error::Io)?;
++    stream.write_all(body).map_err(Error::Io)?;
++    stream.flush().map_err(Error::Io)
+ }
+ 
+ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+@@ -728,9 +702,10 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+ pub fn wait_ready(gateway: &Gateway, timeout: Duration) -> bool {
+     let deadline = Instant::now() + timeout;
+     let url = format!("{}/flint/v1/health", gateway.url());
++    let connector = TcpConnector::new();
+     while Instant::now() < deadline {
+-        if let Ok(response) = reqwest::blocking::get(&url) {
+-            if response.status().is_success() {
++        if let Ok((status, _)) = connector.request("GET", &url, b"") {
++            if (200..300).contains(&status) {
+                 return true;
+             }
+         }
+@@ -745,7 +720,9 @@ mod tests {
+     use flint_messenger::{Envelope, Identity, MessageKind, DEFAULT_TTL_SECS};
+ 
+     fn addr(seed: u8) -> String {
+-        crate::address::address_from_key("tgrin", &[seed; 32]).expect("address")
++        Address::from_key("tgrin", [seed; 32])
++            .expect("address")
++            .to_string()
+     }
+ 
+     #[test]
+@@ -754,7 +731,6 @@ mod tests {
+             config: GatewayConfig::default(),
+             messages: Mutex::new(HashMap::new()),
+             posts: Mutex::new(HashMap::new()),
+-            http: reqwest::blocking::Client::new(),
+             active: AtomicUsize::new(0),
+         };
+         let limit = state.config.max_posts_per_minute;
+@@ -774,7 +750,6 @@ mod tests {
+             config: GatewayConfig::default(),
+             messages: Mutex::new(HashMap::new()),
+             posts: Mutex::new(HashMap::new()),
+-            http: reqwest::blocking::Client::new(),
+             active: AtomicUsize::new(0),
+         };
+         let limit = state.config.max_posts_per_minute;
+@@ -796,24 +771,15 @@ mod tests {
+     }
+ 
+     fn post(url: &str, body: &str) -> (u16, String) {
+-        let response = reqwest::blocking::Client::new()
+-            .post(url)
+-            .header("Content-Type", "application/json")
+-            .body(body.to_string())
+-            .send()
++        let (status, response) = TcpConnector::new()
++            .request("POST", url, body.as_bytes())
+             .expect("post");
+-        (
+-            response.status().as_u16(),
+-            response.text().unwrap_or_default(),
+-        )
++        (status, String::from_utf8_lossy(&response).to_string())
+     }
+ 
+     fn get(url: &str) -> (u16, String) {
+-        let response = reqwest::blocking::get(url).expect("get");
+-        (
+-            response.status().as_u16(),
+-            response.text().unwrap_or_default(),
+-        )
++        let (status, response) = TcpConnector::new().request("GET", url, b"").expect("get");
++        (status, String::from_utf8_lossy(&response).to_string())
+     }
+ 
+     fn put(url: &str, to: &str, payload: &str) -> (u16, String) {
+@@ -1091,7 +1057,6 @@ mod tests {
+         use flint_messenger::Transport;
+ 
+         let (_gateway, url) = start_gateway(GatewayConfig {
+-            wallet_proxy: false,
+             require_signed_ack: true,
+             ..GatewayConfig::default()
+         });
+@@ -1145,7 +1110,6 @@ mod tests {
+         std::fs::create_dir_all(&dir).unwrap();
+         let make = || {
+             start_gateway(GatewayConfig {
+-                wallet_proxy: false,
+                 require_signed_ack: true,
+                 store_dir: Some(dir.clone()),
+                 ..GatewayConfig::default()
+@@ -1186,7 +1150,6 @@ mod tests {
+         let dir = std::env::temp_dir().join(format!("flint-relay-quota-{}", uuid::Uuid::new_v4()));
+         std::fs::create_dir_all(&dir).unwrap();
+         let config = || GatewayConfig {
+-            wallet_proxy: false,
+             store_dir: Some(dir.clone()),
+             max_per_recipient: 1,
+             ..GatewayConfig::default()
+@@ -1372,33 +1335,6 @@ mod tests {
+         assert!(messages(&body).is_empty());
+     }
+ 
+-    #[test]
+-    fn proxy_forwards_only_foreign_api() {
+-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("stub");
+-        let port = listener.local_addr().expect("addr").port();
+-        std::thread::spawn(move || {
+-            if let Ok((mut stream, _)) = listener.accept() {
+-                let mut buffer = [0u8; 4096];
+-                let _ = stream.read(&mut buffer);
+-                let body = b"{\"result\":{\"Ok\":\"stub\"}}";
+-                let head = format!(
+-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+-                    body.len()
+-                );
+-                let _ = stream.write_all(head.as_bytes());
+-                let _ = stream.write_all(body);
+-            }
+-        });
+-
+-        let (_gateway, url) = start_gateway(GatewayConfig {
+-            wallet_foreign_url: format!("http://127.0.0.1:{port}/v2/foreign"),
+-            ..GatewayConfig::default()
+-        });
+-        let (status, body) = post(&format!("{url}/v2/foreign"), "{\"jsonrpc\":\"2.0\"}");
+-        assert_eq!(status, 200);
+-        assert!(body.contains("stub"), "{body}");
+-    }
+-
+     #[test]
+     fn connection_flood_is_shed_with_503() {
+         let (gateway, _url) = start_gateway(GatewayConfig::default());
+@@ -1436,7 +1372,6 @@ mod tests {
+         let broken = dir.join("store");
+         std::fs::write(&broken, b"not a directory").unwrap();
+         let (_gateway, url) = start_gateway(GatewayConfig {
+-            wallet_proxy: false,
+             store_dir: Some(broken),
+             ..GatewayConfig::default()
+         });

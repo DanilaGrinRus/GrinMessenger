@@ -1,0 +1,188 @@
+# GrinMessageModule (extraction из Flint messenger) — отчёт о выделении (2026-11-07)
+
+## Что сделано
+
+Из публичного репозитория [DanilaGrinRus/Flint](https://github.com/DanilaGrinRus/Flint)
+(commit `20efa26a953f83a36ec0fe248e390d0031d01a95`, 2026-10-30) выделен и
+адаптирован самостоятельный мессенджер на Tor/Arti. Код кошелька, ноды, UI,
+RPC и платёжной интеграции **не переносился**.
+
+| Крейт | Назначение | Источник в upstream |
+|---|---|---|
+| `flint-messenger` | envelope v1, crypto, PoW, ACK, store/history/contacts/keywrap, транспорты, Nostr | `crates/messenger` |
+| `flint-tor-arti` | in-process Arti: onion v3 из seed, onion service, HTTP-over-Tor | `third_party/grin-wallet/impls/src/tor/arti.rs` (Apache-2.0), `crates/core/src/onion.rs` |
+| `flint-gateway` (`flint-relay`) | standalone store-and-forward relay без кошелька | `crates/core/src/gateway.rs`, `crates/core/src/bin/flint-relay.rs` |
+| `flint-messenger-cli` (`flintmsg`) | keygen/address/serve/send/fetch | новый код; использует извлечённые крейты |
+
+Лицензия: **MIT OR Apache-2.0** (владелец прав разрешил перелицензировать
+выделенный код; Apache-2.0-части grin-wallet сохраняют уведомления). См.
+[PROVENANCE.md](../../PROVENANCE.md), [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
+
+## Окружение и артефакты
+
+| | |
+|---|---|
+| OS | Windows x64 (10.0.26100), PowerShell 7 |
+| Rust | cargo/rustc 1.99.1 (MSVC, `x86_64-pc-windows-msvc`) |
+| Сборка | offline, вендор `C:\DHW\vendor` через унаследованный `C:\DHW\.cargo\config.toml`; crates.io в окружении недоступен |
+| Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
+| Версия | workspace `0.1.0`, `rust-version = 1.92` |
+| Исходники | 35 `.rs`, 10 386 строк; `Cargo.lock` 556 пакетов |
+| Бинари (build output) | `target/debug/flintmsg.exe` 26.97 МБ, `target/debug/flint-relay.exe` 3.22 МБ; **в поставку не входят, пересобираются из исходников** |
+| Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256) |
+
+## Проверки
+
+Все команды выполнялись из `C:\DHW\GrinMessageModule` (на момент extraction —
+`FlintMessenger`) с `CARGO_TARGET_DIR=…\target`,
+`TMP/TEMP=…\.tmp-build`, `--offline --locked`.
+
+| # | Проверка | Результат | Лог |
+|---|---|---|---|
+| 1 | `cargo build --workspace --offline --locked` | **PASS** (EXIT_CODE=0) | [01-build.log](01-build.log) |
+| 2 | `cargo test --workspace --offline --locked` | **PASS**: 125 passed, 0 failed, 3 ignored (EXIT_CODE=0) | [02-tests.log](02-tests.log) |
+| 2a | из них `flint-messenger` lib | 89 passed, 1 ignored (Nostr live) | |
+| 2b | `flint-gateway` lib | 19 passed | |
+| 2c | `flint-tor-arti` lib | 5 passed (onion vectors, derivation) | |
+| 2d | `flint-messenger-cli` tests | 3 (`cli_smoke`) + 9 (`loopback_e2e`) passed | |
+| 3 | `cargo fmt --all -- --check` | **PASS** (EXIT_CODE=0) | [03-fmt.log](03-fmt.log) |
+| 4 | `cargo test -p flint-gateway --test relay_live -- --ignored --test-threads=1` | **PASS**, 1 passed: реальный процесс `flint-relay`, quarantine битых envelope и restart-skip | [04-relay-live.log](04-relay-live.log) |
+| 5 | Двухпроцессный loopback e2e: `flint-relay.exe` + `flintmsg keygen/send/fetch` | **PASS**: доставка, открытие, signed ACK, повторный fetch пуст | [06-e2e-demo.log](06-e2e-demo.log) |
+| 6 | `cargo test -p flint-tor-arti --test live_onion -- --ignored --nocapture` (live Tor) | **FAILED, NOT VERIFIED/BLOCKED**: bootstrap timeout 300 с; в окружении нет доступа к сети Tor (dir-auth :9101 недоступен, локального SOCKS нет), при этом clearnet `1.1.1.1:443` открыт. PASS не заявляется. | [05-live-tor.log](05-live-tor.log) |
+| 7 | Чистая сборка из состава поставки (каталоги `target*`/`.tmp*` удалены) | **PASS**: `cargo build --workspace --offline --locked` 70.1 с, EXIT 0; `cargo test --workspace --offline --locked` 125 passed / 0 failed / 3 ignored, EXIT 0 | [07-clean-build.log](07-clean-build.log), [08-clean-tests.log](08-clean-tests.log) |
+| 8 | Post-rename branding (`GrinMessageModule`, `repository` в манифестах) + повторная сборка/тесты/fmt | **PASS**: build 160 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [09-rename-build.log](09-rename-build.log), [10-rename-tests.log](10-rename-tests.log), [11-rename-fmt.log](11-rename-fmt.log) |
+
+Итог на момент отчёта: **static/unit/build/manual loopback — PASS; live Tor —
+FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor); mock за live не
+выдаётся.**
+
+Freeze-манифест кода/доков: [source-sha256.sha256](source-sha256.sha256), его
+SHA-256 — `11716d8ab4af90041c92aafb734bc1274544155798aa63a4f6fab4691e94bd29`
+([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
+не входит в freeze-манифест и может дополняться VERIFY.md/логами.
+
+> Примечание о VERIFY.md: независимая верификация выполнена на pre-publication
+> freeze `487d5892…65f04` (каталог тогда назывался `FlintMessenger`). После неё
+> изменены только branding-файлы (README/PROVENANCE/NOTICE/THIRD_PARTY_NOTICES/
+> заголовки docs), поле `repository` в `Cargo.toml` и имя каталога; **код не
+> менялся**, повторные build/test/fmt — логи 09–11, новый freeze-манифест —
+> `11716d8a…4bd29`. VERIFY.md оставлен как исторический артефакт.
+
+### Что именно подтверждено
+
+- сборка всего workspace offline из вендора, `--locked` без расхождений;
+- 125 автотестов: протокол (envelope/crypto/PoW/TTL/ACK/квоты/quarantine),
+  19 тестов relay (HTTP API, signed ACK, PoW, лимиты, restart-персистентность),
+  onion-векторы Tor v3, loopback e2e двух идентичностей, CLI-процессы;
+- ignored `relay_live`: реальный дочерний процесс `flint-relay`, битые
+  envelope-ы в quarantine, restart skip;
+- CLI: `keygen/address/send/fetch` с реальными процессами; повторный fetch после
+  signed ACK не возвращает сообщение;
+- onion-адрес из seed совпадает с Tor v3 вектором
+  `2a6at2obto3uvkpkitqp4wxcg6u36qf534eucbskqciturczzc5suyid`.
+
+### Что НЕ подтверждено (честно)
+
+- **Live Tor**: результат зависит от доступности сети Tor в окружении; при
+  недоступности — NOT VERIFIED/BLOCKED с логом, не PASS. Арти-клиент/сервис
+  собираются и юнит-тесты проходят, но это не доказывает живой onion.
+- **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
+- **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
+  DEV/testnet-инструмент.
+- **Nostr-транспорт**: присутствует в библиотеке (перенесён), live-тест требует
+  внешний relay и по умолчанию ignored; CLI его не использует.
+- **Постоянная история/контакты в CLI**: не ведутся (библиотечные `History`/
+  `ContactBook`/`FileMailbox` доступны для встраивания).
+
+## Известные отличия от upstream (адаптация)
+
+1. `flint-gateway`: удалён wallet proxy (`/v2/foreign`, `wallet_proxy`,
+   `wallet_foreign_url`, `reqwest`); `POST /v2/foreign` теперь общий 404.
+2. `flint-messenger`: добавлена абстракция `HttpConnector`/`TcpConnector` и
+   конструкторы `with_connector`; `new`/`with_socks` и поведение HTTP сохранены.
+3. `flint-tor-arti`: вместо внешнего `tor.exe`/SOCKS — in-process Arti;
+   grin-специфичные `TorConfig`/`SecretKey`/`Error` заменены локальными типами;
+   сроки bootstrap/request задаются в `TorConfig`.
+4. Валидация адреса в relay — `flint_messenger::Address::parse` (эквивалент
+   прежней проверки bech32 + hrp grin/tgrin + 32-byte key).
+5. Документация адаптирована; wallet/Slatepack-автоматика удалена, а не
+   перенесена как непроверяемое утверждение.
+6. CLI `serve`: id сообщения помечается подтверждённым в памяти только после
+   успешного signed ACK; при ошибке ACK повторяется на следующем poll.
+
+## Исправлено по итогам независимой верификации (2026-11-07)
+
+1. `LICENSE-MIT` — добавлена строка copyright (`Copyright (c) 2026 DanilaGrinRus`).
+2. Битая ссылка `crates/flint-messenger/src/keywrap.rs` (`docs/historical/ARGON2ID.md`)
+   и ссылки Nostr-модулей (`docs/contracts/MESSENGER.md`) заменены на
+   `docs/PROTOCOL.md` / `docs/ARCHITECTURE.md`.
+3. `docs/ARCHITECTURE.md` исправлены две неточности: gateway сам биндит loopback
+   listener; CLI `serve` хранит неподтверждённые envelope-ы в file-backed
+   mailbox gateway (`<data>/mailbox`), а не «не сохраняет на диск».
+4. CLI `serve`: ACK-retry (см. отличия п.6) — найденный верификатором P3-дефект.
+5. `evidence`: перегенерированы логи с `EXIT_CODE`, уточнены числа (556 пакетов,
+   10 386 строк, 125/0/3 тестов), live Tor явно помечен FAILED/NOT VERIFIED.
+6. `README.md` — статус и сводка тестов приведены к фактическим результатам.
+
+## Остаток работ (не входит в extraction)
+
+- Live Tor прогон на машине с доступом к сети Tor (два процесса `serve` + `send`),
+  публикация onion-relay;
+- независимый security review криптографии/протокола;
+- оценка лицензий всех транзитивных зависимостей (на этой машине нет сканера;
+  `Cargo.lock` — инвентарь);
+- при публикации — git-репозиторий, CI, SBOM;
+- UI/упаковка: не входят в этот проект (CLI + библиотека).
+
+## Независимая верификация
+
+Отдельный агент-верификатор проверил замороженное состояние независимо
+(свой `target-verify`, повторные прогоны build/test/fmt/E2E, диффы к upstream,
+аудит лицензий/секретов) и выпустил
+[VERIFY.md](VERIFY.md) (SHA-256 `46c7d4591e87e4f006edfdb2d6aa18e17542f11ff028b256ec2baf4acbcb3bfc`),
+логи — [verify-raw/](verify-raw/).
+
+**Вердикт верификатора: готово как extraction, с оговоркой live Tor NOT
+VERIFIED; известных P0–P2 дефектов на замороженном состоянии нет.**
+
+- PASS: повторные fmt/build/test (125/0/3), ignored `relay_live` (реальный
+  процесс), двухпроцессный loopback E2E, лицензии/provenance, содержательность
+  выделения, отсутствие P0–P2.
+- NOT VERIFIED/BLOCKED: live Tor (сеть Tor непригодна в окружении), direct-режим
+  CLI (`serve`/`send` на onion), live Nostr (нужен внешний relay), release-сборка,
+  security-аудит, не-Windows платформы.
+- Freeze-привязка: все 50 хэшей `source-sha256.sha256` пересчитаны (50/50),
+  SHA-256 манифеста совпал; upstream-манифест 40/40, клон HEAD `20efa26a…`, clean.
+- 9 замечаний, найденных верификатором, исправлены и перепроверены (см. выше).
+- Остаточные P3 (не блокеры): формулировка PROVENANCE без упоминания правок
+  doc-комментариев; LICENSE-APACHE без необязательного APPENDIX; пустое
+  `repository = ""`; сводка THIRD_PARTY_NOTICES без лицензионного сканера; перед
+  публикацией — `cargo deny`/SBOM и очистка build-каталогов.
+
+## Состав поставки
+
+`C:\DHW\GrinMessageModule` — каталог с исходниками, `Cargo.toml`/`Cargo.lock`,
+документацией, лицензиями и evidence; **~0.8 МБ**. Каталоги сборки (`target*`) и
+временные (`.tmp*`) удалены; для запуска достаточно
+`cargo build --workspace --offline --locked` (в окружении с вендором) или
+`cargo build` на машине с crates.io. Upstream-клон
+`C:\DHW\tmp\flint-upstream` и вендор `C:\DHW\vendor` — внешние, в поставку не
+входят.
+
+## Воспроизведение
+
+```powershell
+Set-Location C:\DHW\GrinMessageModule
+$env:TMP = "C:\DHW\GrinMessageModule\.tmp-build"; $env:TEMP = $env:TMP
+$env:CARGO_TARGET_DIR = "C:\DHW\GrinMessageModule\target"
+cargo build --workspace --offline --locked
+cargo test  --workspace --offline --locked
+cargo test -p flint-gateway --test relay_live --offline -- --ignored --test-threads=1
+```
+
+Live Tor (если сеть доступна):
+
+```powershell
+cargo test -p flint-tor-arti --test live_onion --offline -- --ignored --nocapture
+```

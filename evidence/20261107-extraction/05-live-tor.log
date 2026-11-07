@@ -1,0 +1,23 @@
+=== live_onion attempt #2 with Arti diagnostics (needs Tor network) ===
+started: 2026-11-07T19:06:23.5198413+07:00
+   Compiling flint-tor-arti v0.1.0 (C:\DHW\FlintMessenger\crates\flint-tor-arti)
+    Finished `test` profile [unoptimized] target(s) in 2.11s
+     Running tests\live_onion.rs (target\debug\deps\live_onion-fe1e74537c5e1735.exe)
+
+running 1 test
+[arti INFO ] Bootstrapping Tor/Arti (timeout 300s)
+test live_onion_service_roundtrip has been running for over 60 seconds
+
+thread 'live_onion_service_roundtrip' (35132) panicked at crates\flint-tor-arti\tests\live_onion.rs:79:29:
+onion service start: tor: bootstrap timeout (300s); проверьте сеть/Tor
+test live_onion_service_roundtrip ... FAILED
+
+failures:
+
+failures:
+    live_onion_service_roundtrip
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 300.02s
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p flint-tor-arti --test live_onion`

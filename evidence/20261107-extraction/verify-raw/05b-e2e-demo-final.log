@@ -1,0 +1,62 @@
+
+=== independent loopback E2E (real processes) 2026-11-07T19:14:45.7454833+07:00 ===
+work=C:\DHW\FlintMessenger\.tmp-verify\e2e-20261107-191445
+flint-relay.exe sha256=CFC0D4F418742C6DA4B9207C1582B969E7697C90F4497C35919C48735CABDC08
+flintmsg.exe    sha256=73CA2C8188A89140BD69B02EF300AD6DB40D8111CA743B346607967110824A5B
+RESULT binaries-exist PASS 
+relay_url=http://127.0.0.1:50935
+relay_pid=8056
+RESULT relay-process-ready PASS 
+relay_stdout: flint-relay listening on http://127.0.0.1:50935 | store: C:\DHW\FlintMessenger\.tmp-verify\e2e-20261107-191445\relay-store | ttl: 93600s, per-recipient: 100, total: 10000 | signed acks: required, proof of work: required | Publish this listener through Tor; do not expose it as plain HTTP. | 
+keygen_alice exit=0 out={"address":"tgrin1307yv2ulzp86fq2urk2psjpyp5gyuu4454qg3kd9xhcvammzywlqykklpy","event":"keygen","identity":"C:\\DHW\\FlintMessenger\\.tmp-verify\\e2e-20261107-191445\\alice.json","network":"tgrin","onion":"rp6emk47cbh2jak4dwkbqsbebuie44vvuvairwnfgxym533ceo7hmwyd"}
+keygen_bob   exit=0 out={"address":"tgrin1mvvw58gy4sggcunr85va7hdc5q7yrc834m3yda9qkg7vccsswx7q48qdhv","event":"keygen","identity":"C:\\DHW\\FlintMessenger\\.tmp-verify\\e2e-20261107-191445\\bob.json","network":"tgrin","onion":"3mmouhievqiiy4tdhum56xnyua6edyhrv3ren5fawi6myyqqog6f7zid"}
+RESULT keygen-exit PASS 
+RESULT keygen-alice-address PASS 
+RESULT keygen-bob-address PASS 
+alice=tgrin1307yv2ulzp86fq2urk2psjpyp5gyuu4454qg3kd9xhcvammzywlqykklpy onion=rp6emk47cbh2jak4dwkbqsbebuie44vvuvairwnfgxym533ceo7hmwyd
+bob=tgrin1mvvw58gy4sggcunr85va7hdc5q7yrc834m3yda9qkg7vccsswx7q48qdhv onion=3mmouhievqiiy4tdhum56xnyua6edyhrv3ren5fawi6myyqqog6f7zid
+address_bob exit=0 out={"address":"tgrin1mvvw58gy4sggcunr85va7hdc5q7yrc834m3yda9qkg7vccsswx7q48qdhv","event":"address","onion":"3mmouhievqiiy4tdhum56xnyua6edyhrv3ren5fawi6myyqqog6f7zid","onion_url":"http://3mmouhievqiiy4tdhum56xnyua6edyhrv3ren5fawi6myyqqog6f7zid.onion"}
+RESULT address-exit PASS 
+RESULT address-roundtrip PASS 
+RESULT address-has-onion-url PASS 
+send exit=0 out={"event":"sent","id":"b6d887a7-6a8b-4063-9b8a-a0226f39cc76","remote":"http://127.0.0.1:50935","to":"tgrin1mvvw58gy4sggcunr85va7hdc5q7yrc834m3yda9qkg7vccsswx7q48qdhv","via":"relay"}
+RESULT send-exit PASS 
+RESULT send-event PASS 
+RESULT send-id-uuid PASS 
+RESULT relay-store-one-file PASS count=1
+RESULT relay-store-file-named-by-id PASS file=b6d887a7-6a8b-4063-9b8a-a0226f39cc76.json
+RESULT relay-store-no-plaintext PASS 
+RESULT relay-store-no-sender-address PASS 
+RESULT relay-store-id-matches PASS 
+RESULT relay-store-recipient-is-known-metadata PASS 
+RESULT relay-store-payload-opaque PASS 
+relay_store_bytes=881
+unsigned_ack_http_status=401
+RESULT unsigned-ack-rejected PASS 
+RESULT unsigned-ack-does-not-delete PASS count=1
+fetch exit=0 out={"created_at":1794053686,"event":"message","from":"tgrin1307yv2ulzp86fq2urk2psjpyp5gyuu4454qg3kd9xhcvammzywlqykklpy","id":"b6d887a7-6a8b-4063-9b8a-a0226f39cc76","kind":"text","text":"verify-e2e-marker: hello over standalone relay"}
+{"count":1,"event":"acked"}
+{"event":"fetched","opened":1,"source":"http://127.0.0.1:50935"}
+RESULT fetch-exit PASS 
+RESULT fetch-opened-one PASS opened=1
+RESULT fetch-message-event PASS 
+RESULT fetch-text-matches PASS 
+RESULT fetch-from-alice PASS 
+RESULT fetch-signed-ack-count PASS 
+RESULT signed-ack-deleted-from-relay PASS remaining=0
+fetch2 exit=0 out={"count":0,"event":"acked"}
+{"event":"fetched","opened":0,"source":"http://127.0.0.1:50935"}
+RESULT fetch2-exit PASS 
+RESULT fetch2-empty PASS opened=0
+relay_stopped pid=8056
+offline_send exit=1 out=flintmsg: send: хранилище: gateway: connect: Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение. (os error 10061)
+RESULT offline-send-nonzero PASS 
+RESULT offline-send-no-sent-event PASS 
+offline_fetch exit=1 out=flintmsg: fetch: хранилище: gateway: connect: Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение. (os error 10061)
+RESULT offline-fetch-nonzero PASS 
+direct_send_with_plain exit=1 out=flintmsg: direct-доставка на onion требует Arti; для relay-теста используйте --relay URL --plain
+RESULT direct-plain-refused PASS 
+plain-onion-refused exit=1 out=flintmsg: --plain не умеет .onion: direct-доставка и onion-relay требуют Arti (уберите --plain)
+RESULT plain-onion-refused PASS 
+identity seed files deleted: True
+=== SUMMARY failures=0 ===

@@ -1,0 +1,6 @@
+=== build ===
+   Compiling flint-messenger v0.1.0 (C:\DHW\FlintMessenger\crates\flint-messenger)
+   Compiling flint-gateway v0.1.0 (C:\DHW\FlintMessenger\crates\flint-gateway)
+   Compiling flint-messenger-cli v0.1.0 (C:\DHW\FlintMessenger\crates\flint-messenger-cli)
+    Finished `dev` profile [unoptimized] target(s) in 5.24s
+EXIT_CODE=0 ELAPSED_SEC=5.4
