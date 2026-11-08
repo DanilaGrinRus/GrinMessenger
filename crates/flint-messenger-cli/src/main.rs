@@ -294,8 +294,10 @@ fn cmd_serve(args: &[String]) -> CliResult<()> {
     let mut identity_path = PathBuf::from("identity.json");
     let mut data = PathBuf::from("flintmsg-data");
     let mut listen = "127.0.0.1:0".to_string();
-    let mut poll_secs = 2u64;
-    let mut limit = 20usize;
+    // Direct-mode inbox drain: fast enough that a cheap flood cannot hold the
+    // 500-message queue between polls. The relay still enforces its own limits.
+    let mut poll_secs = 1u64;
+    let mut limit = 100usize;
     let mut ttl_secs = 12 * 60 * 60u64;
     let mut tor_state: Option<PathBuf> = None;
     let mut bridge_line: Option<String> = None;

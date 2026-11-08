@@ -30,10 +30,10 @@ RPC и платёжной интеграции **не переносился**.
 | GCP (live Tor) | Ubuntu 24.04 VM `grin-linux-build` (e2-medium, us-central1-a), Rust 1.99.1, публичный интернет; репозиторий клонирован с GitHub |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
-| Исходники | 46 `.rs`, 16 505 строк; `Cargo.lock` 556 пакетов; + встроенные `ui.html` / `wallet_ui.html` + пример `envelope_v2_demo` |
+| Исходники | 47 `.rs`, 16 580 строк; `Cargo.lock` 556 пакетов; + встроенные `ui.html` / `wallet_ui.html` + примеры `envelope_v2_demo`, `embedded_wallet` |
 | Бинари (build output) | `target/debug/flintmsg.exe` 27.00 МБ, `target/debug/flint-relay.exe` 3.28 МБ, `target/debug/flintmsg-ui.exe` 27.12 МБ, `target/debug/flintmsg-walletd.exe` 27.42 МБ, `target/debug/flintmsg-wallet-ui.exe` 5.23 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
-| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 74 файла |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 84 файла |
 
 ## Проверки
 
@@ -74,6 +74,9 @@ RPC и платёжной интеграции **не переносился**.
 | 25 | Полный прогон после security-фиксов: build/test/fmt `--locked` | **PASS**: **154 passed / 0 failed / 2 ignored**, fmt PASS; `relay_live` PASS | [29-security-tests.log](29-security-tests.log) |
 | 26 | Envelope v2: sender proof inside ciphertext, `[0;64]` outer signature, v1 open compatibility, forged sender proof rejection | **PASS**: 156 passed / 0 failed / 2 ignored после v2; тесты `v2_outer_signature_is_not_sender_auth`, `legacy_v1_envelope_still_opens`, `forged_sender_proof_is_rejected`; demo: v2 wire без sender/signature, v1 открывается | [32-envelope-v2-tests.log](32-envelope-v2-tests.log), [33-envelope-v2-demo.log](33-envelope-v2-demo.log) |
 | 27 | CI/release: Windows+Linux matrix, fmt/clippy/audit, GitHub Release v0.1.0 (binaries, SHA-256, Cargo.lock.release, CycloneDX SBOM) | **PASS**: CI run green (Windows+Linux, audit with documented exceptions); release run green, артефакты и SBOM опубликованы | `docs/RELEASE.md`, [release v0.1.0](https://github.com/DanilaGrinRus/GrinMessenger/releases/tag/v0.1.0) |
+| 28 | Direct-mode anti-DoS: убран shared loopback rate limit, очередь 500/5000, быстрый drain 1 s/100, PoW; анализ/design | **PASS**: burst-тест; cost/design в `docs/ANTI_DOS.md`; residual sustained-flood задокументирован | [34-anti-dos.log](34-anti-dos.log) |
+| 29 | Wallet adapters: PR-ready outline grin-wallet, Grin++ sidecar packaging, mobile FFI plan, compilable embedded example | **PASS**: example собран и запущен против реального локального relay | [35-wallet-adapters.log](35-wallet-adapters.log) |
+| 30 | Relay deployment kit: systemd hardening + Tor hidden service + Dockerfile + monitoring/abuse docs; локальный smoke | **PASS** (kit проверен локально; публичный relay не разворачивался) | [36-ops-kit.log](36-ops-kit.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI, интеграция
 с кошельками (embedded + sidecar API + console), security-hardening, envelope v2
@@ -84,7 +87,7 @@ RPC и платёжной интеграции **не переносился**.
 Tor-выхода, поэтому live-прогон выполнен на GCP и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
+SHA-256 — `e622d57b6a77fe732e1b863e3385d4b8802bd8946551abdcf5ffdf0c7586723a`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
@@ -93,7 +96,7 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
 > изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
 > добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
 > 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
-> актуальный freeze-манифест — `176e4afb…6d55`. VERIFY.md оставлен как
+> актуальный freeze-манифест — `e622d57b…723a`. VERIFY.md оставлен как
 > исторический артефакт.
 
 ### Что именно подтверждено
@@ -123,10 +126,14 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
   UI/console browser guard; **envelope v2** (sender proof в ciphertext, v1 open
   compatibility, wire без публичной sender-подписи); **CI/release** (Windows+
   Linux matrix, clippy -D warnings, audit, GitHub Release v0.1.0 с бинарями,
-  SHA-256 и SBOM) — [29-security-tests.log](29-security-tests.log),
+  SHA-256 и SBOM); **anti-DoS drain**, **wallet adapters** и **relay deployment
+  kit** — [29-security-tests.log](29-security-tests.log),
   [30-security-demo.log](30-security-demo.log),
   [32-envelope-v2-tests.log](32-envelope-v2-tests.log),
-  [33-envelope-v2-demo.log](33-envelope-v2-demo.log).
+  [33-envelope-v2-demo.log](33-envelope-v2-demo.log),
+  [34-anti-dos.log](34-anti-dos.log),
+  [35-wallet-adapters.log](35-wallet-adapters.log),
+  [36-ops-kit.log](36-ops-kit.log).
 
 ### Что НЕ подтверждено (честно)
 
@@ -142,9 +149,10 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
 - **Остаточные ограничения**: legacy v1 envelopes сохраняют публичную
   sender-подпись (candidate check); повторное использование seed адрес-ключа
   связывает онлайновость onion с платёжным адресом; sustained direct-flood может
-  задерживать доставку (sender-authenticated quotas в v1 нет); v1-only клиенты не
-  открывают v2. Все пункты явно описаны в `docs/SECURITY.md` / `PROTOCOL.md` и не
-  выдаются за PASS.
+  задерживать доставку (sender-authenticated quotas в v1/v2 нет); v1-only клиенты
+  не открывают v2. Публичный relay не разворачивался (только deployment kit +
+  локальный smoke); mobile FFI — план, не реализация. Все пункты явно описаны в
+  `docs/SECURITY.md` / `PROTOCOL.md` / `ANTI_DOS.md` и не выдаются за PASS.
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
 - **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
   DEV/testnet-инструмент.

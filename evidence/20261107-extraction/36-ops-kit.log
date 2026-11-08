@@ -1,0 +1,13 @@
+=== relay deployment-kit smoke (local) ===
+flint-relay listening on http://127.0.0.1:18085
+store: C:\DHW\GrinMessageModule\.tmp-ops-smoke\store
+ttl: 3600s, per-recipient: 20, total: 100
+signed acks: required, proof of work: required
+mailbox fetch: signed address proof required
+Publish this listener through Tor; do not expose it as plain HTTP.
+health: {"ok":true}
+unsigned/bad fetch status: 400
+store created: True
+True
+True
+True

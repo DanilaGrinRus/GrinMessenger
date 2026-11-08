@@ -1,5 +1,8 @@
 # Wallet integration
 
+Adapter-level guide for specific wallets (grin-wallet PR outline, Grin++ sidecar packaging,
+mobile FFI plan): [WALLET_ADAPTERS.md](WALLET_ADAPTERS.md).
+
 This document describes how a Grin wallet integrates GrinMessenger as its
 messaging / Slatepack transport. It is written for two audiences:
 

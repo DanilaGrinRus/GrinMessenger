@@ -97,8 +97,16 @@ origin.
     guards, signed relay mailbox fetch proofs, canonical UUID handling,
     direct-mode queue-based inbound DoS mitigation, owner-only secret-file
     creation (Unix atomically, Windows ACL hardening for the wallet daemon). See
-    `docs/SECURITY.md`; the envelope wire format is unchanged (sender-anonymity
-    limitation documented for v1).
+    `docs/SECURITY.md`.
+12. Envelope v2 (2026-11-08): sender authentication moved inside the encrypted
+    payload (the public outer signature is zero/unused for v2); v1 remains
+    readable on open and `seal_legacy_v1` is kept for interoperability. New
+    tests/demo: `crates/flint-messenger/examples/envelope_v2_demo.rs`,
+    `docs/PROTOCOL.md`, `docs/SECURITY.md`.
+13. Delivery hardening (2026-11-08): CI matrix + release workflow with SBOM and
+    per-platform checksums, direct-mode queue/drain (`docs/ANTI_DOS.md`), wallet
+    adapter guide (`docs/WALLET_ADAPTERS.md`), relay deployment kit
+    (`deploy/relay/`). No wallet RPC or new external crate was added.
 
 ## Reproducing the provenance check
 

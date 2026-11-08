@@ -120,7 +120,7 @@ fill the queue for a while; there is no sender identity at the gateway to build
 a per-sender quota, and no recipient allowlist in v1. A queued legitimate
 message can be delayed under sustained flood. This is an inherent cost of
 anonymous push delivery without sender-authenticated quotas; a recipient-side
-contact policy/v2 ticket design is future work.
+contact policy/v2 ticket design is future work; the cost analysis and evaluated designs are in [docs/ANTI_DOS.md](ANTI_DOS.md).
 
 Test: `direct_mode_queue_does_not_share_the_relay_post_rate`.
 

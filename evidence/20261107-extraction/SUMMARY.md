@@ -48,6 +48,26 @@ binds, and the daemon takes the seed from a file/env/identity file (or generates
 one explicitly). Contract: [docs/WALLET_INTEGRATION.md](../../docs/WALLET_INTEGRATION.md).
 Evidence: [26-wallet-tests.log](26-wallet-tests.log), [27-wallet-demo.log](27-wallet-demo.log).
 
+## Direct-mode anti-DoS and wallet adapters (2026-11-08)
+
+Direct mode no longer uses the shared loopback post-rate bucket (it was a cheap
+inbound DoS: all Tor senders appear as 127.0.0.1). Direct gateways use a
+500/recipient, 5 000-total queue, PoW and a fast 1 s / 100-message recipient drain
+(CLI/UI/wallet defaults). The residual sustained-flood risk and evaluated
+alternatives (blind tickets, dynamic PoW, contacts-only) are documented in
+[docs/ANTI_DOS.md](../../docs/ANTI_DOS.md). Evidence:
+[34-anti-dos.log](34-anti-dos.log).
+
+Wallet adapters: `docs/WALLET_ADAPTERS.md` gives a PR-ready grin-wallet outline,
+Grin++ sidecar packaging/process handshake and a mobile FFI plan; a compilable
+embedded example is `crates/flint-messenger-wallet/examples/embedded_wallet.rs`
+(built and run against a real local relay, [35-wallet-adapters.log](35-wallet-adapters.log)).
+
+Ops: `deploy/relay/` contains a systemd unit with hardening, Tor hidden-service
+configuration, Dockerfile and monitoring/abuse guidance; a local relay smoke test
+is in [36-ops-kit.log](36-ops-kit.log). No public relay is operated by this
+repository or was deployed from this environment.
+
 ## Envelope v2 (2026-11-08)
 
 Envelope **v2** moves the sender's ed25519 authentication inside the encrypted
@@ -124,6 +144,9 @@ fix delivered a direct onion message end to end.
 | Security hardening tests (signed fetch proof, canonical UUIDs, direct-mode burst, private files, UI/console guard) | **PASS**, covered by the workspace suite and the real relay process; [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
 | Envelope v2 (sender proof inside ciphertext, v1 compatibility) | **PASS**: v2 roundtrip, zero outer signature, candidate-sender check impossible for v2, forged sender proof rejected, legacy v1 open/tamper tests; [32-envelope-v2-tests.log](32-envelope-v2-tests.log), [33-envelope-v2-demo.log](33-envelope-v2-demo.log) |
 | Release pipeline: GitHub Release `v0.1.0` with Linux/Windows binaries, per-platform SHA-256, `Cargo.lock.release`, CycloneDX SBOM | **PASS** ([release](https://github.com/DanilaGrinRus/GrinMessenger/releases/tag/v0.1.0)) |
+| Direct-mode anti-DoS: no shared loopback rate bucket, 500/5000 queue, 1 s/100-message drain, PoW | **PASS**: burst test + design/cost analysis in [docs/ANTI_DOS.md](../../docs/ANTI_DOS.md); residual sustained-flood documented | [34-anti-dos.log](34-anti-dos.log) |
+| Wallet adapters: embedded Rust example, grin-wallet PR outline, Grin++ sidecar packaging, mobile FFI plan | **PASS** (compile + local relay run) | [35-wallet-adapters.log](35-wallet-adapters.log) |
+| Relay deployment kit: systemd + Tor + Dockerfile + ops/monitoring guidance, local relay smoke | **PASS** (kit verified locally; **no public relay deployed** — operator action) | [36-ops-kit.log](36-ops-kit.log) |
 | **Live Tor** (cross-process direct onion on a GCP VM) | **PASS** (2026-11-08): Arti bootstrapped 100%, `flintmsg serve` published an onion, `flintmsg send` delivered a direct onion envelope, the receiver opened it and sent a signed ACK; log [25-live-tor-gcp.log](25-live-tor-gcp.log). The local build sandbox has no Tor egress. |
 | Two-process loopback E2E (`flint-relay` + `flintmsg keygen/send/fetch`) | **PASS**: delivery, open, signed ACK, empty re-fetch, offline send fails |
 | Independent verification (separate agent, own build dir) | **PASS**, no P0–P2 defects; 9 findings fixed and re-checked |
@@ -135,7 +158,7 @@ Nostr test (needs an external relay).
 ## Freeze manifest
 
 The delivered source tree is pinned by
-[source-sha256.sha256](source-sha256.sha256) (74 files: crates, Cargo manifests,
+[source-sha256.sha256](source-sha256.sha256) (84 files: crates, Cargo manifests,
 docs, site, screenshot, GitHub workflow, README, licenses, notices; `evidence/`
 is intentionally excluded). Its SHA-256 is stored in
 [source-sha256.sha256.hash](source-sha256.sha256.hash).
@@ -157,7 +180,9 @@ is intentionally excluded). Its SHA-256 is stored in
 - Address-key reuse links the messenger onion to the payment address; derive a
   dedicated messaging seed.
 - Direct-mode delivery is finite-capacity: a sustained flood can still delay
-  messages (no sender-authenticated quota in v1).
+  messages (no sender-authenticated quota in v1/v2).
+- The relay deployment kit is provided but **no public relay** is operated by
+  this repository; mobile FFI is a plan, not an implementation.
 - No forward secrecy, no groups/attachments, no offline guarantee.
 - Not audited; DEV/testnet tool; no mainnet readiness claim.
 - Extraction evidence and reports are in Russian (historical artifacts).

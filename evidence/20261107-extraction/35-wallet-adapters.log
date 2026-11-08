@@ -1,0 +1,7 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.67s
+=== embedded_wallet example (real local relay) ===
+    Finished `dev` profile [unoptimized] target(s) in 0.80s
+     Running `target\debug\examples\embedded_wallet.exe http://127.0.0.1:18086`
+phase=ready mode=relay address=tgrin1r9lkkglpdjzn934tequ04n2757ymurrkk2fqxdqrn0agk0fk34ss5utvz8 unread=0
+data_dir=C:\DHW\GrinMessageModule\.tmp-build\flint-wallet-embedded-37420-1794105266356533600
+events_seen=1 next=1

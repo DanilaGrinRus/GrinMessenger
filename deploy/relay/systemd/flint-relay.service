@@ -1,0 +1,39 @@
+[Unit]
+Description=GrinMessenger store-and-forward relay
+Documentation=https://github.com/DanilaGrinRus/GrinMessenger
+After=network-online.target tor.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flint
+Group=flint
+ExecStart=/usr/local/bin/flint-relay \
+  --listen 127.0.0.1:18080 \
+  --store /var/lib/flint-relay/store \
+  --ttl 93600 \
+  --max-per 100 \
+  --max-total 10000
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flint-relay
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# Optional resource limits (tune to the host):
+# LimitNOFILE=4096
+# MemoryMax=256M
+# IOReadBandwidthMax=/var/lib/flint-relay 100M
+# IOWriteBandwidthMax=/var/lib/flint-relay 100M
+
+[Install]
+WantedBy=multi-user.target

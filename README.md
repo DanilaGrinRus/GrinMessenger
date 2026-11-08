@@ -31,6 +31,9 @@ this is not the Flint wallet.
 | Security / audit triage | [docs/SECURITY.md](docs/SECURITY.md) |
 | Wallet integration | [docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md) |
 | Releases / CI | [docs/RELEASE.md](docs/RELEASE.md) |
+| Direct-mode anti-DoS | [docs/ANTI_DOS.md](docs/ANTI_DOS.md) |
+| Wallet adapters (grin-wallet/Grin++/mobile) | [docs/WALLET_ADAPTERS.md](docs/WALLET_ADAPTERS.md) |
+| Relay deployment kit | [deploy/relay/README.md](deploy/relay/README.md) |
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 Status (2026-11-08): **extraction, adaptation, a local web UI, wallet
@@ -155,8 +158,9 @@ all flags (`--identity`, `--network`, `--listen`, `--relay`, `--plain`,
 
 ## Wallet integration
 
-`flint-messenger-wallet` prepares the module for Grin wallets (full contract:
-[docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md)):
+`flint-messenger-wallet` prepares the module for Grin wallets (generic contract:
+[docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md); adapter-level guide for grin-wallet/Grin++/mobile:
+[docs/WALLET_ADAPTERS.md](docs/WALLET_ADAPTERS.md)):
 
 - **Identity** — a Grin slatepack address is `bech32(ed25519 pubkey)`, and the
   messenger uses the same format. Wallets must derive a dedicated 32-byte

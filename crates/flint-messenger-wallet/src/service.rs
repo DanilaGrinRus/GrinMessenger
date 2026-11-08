@@ -78,8 +78,10 @@ impl Default for ServiceConfig {
             data_dir: PathBuf::from("flintmsg-wallet"),
             network: "tgrin".into(),
             mode: NetworkMode::Direct,
-            poll_secs: 2,
-            fetch_limit: 20,
+            // Fast direct-mode drain so a cheap flood cannot hold the queue
+            // between polls; relay mode is fine with the same cadence.
+            poll_secs: 1,
+            fetch_limit: 100,
             ttl_secs: 12 * 60 * 60,
             tor_state: None,
         }

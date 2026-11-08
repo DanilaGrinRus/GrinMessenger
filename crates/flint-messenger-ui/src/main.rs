@@ -111,7 +111,7 @@ fn parse_args() -> Result<Options, String> {
     let mut relay: Option<String> = None;
     let mut plain = false;
     let mut tor_state: Option<PathBuf> = None;
-    let mut poll_secs = 2u64;
+    let mut poll_secs = 1u64;
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
     while i < args.len() {
@@ -512,7 +512,7 @@ fn poll_loop(shared: Arc<Shared>, poll_secs: u64) {
             }
         };
         let now = flint_messenger::envelope::unix_now();
-        let envelopes = match transport.fetch_signed(&shared.identity, now, 50) {
+        let envelopes = match transport.fetch_signed(&shared.identity, now, 100) {
             Ok(v) => v,
             Err(e) => {
                 let mut status = lock(&shared.status);
