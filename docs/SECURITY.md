@@ -4,7 +4,6 @@ This page records the external audit findings against GrinMessenger, what was
 fixed, and what remains as a documented v1 limitation. It is intentionally
 explicit: a PASS elsewhere in this repository does not override a limitation
 listed here.
-
 ## Fixed
 
 ### 1. `flintmsg-ui`: CSRF / DNS rebinding (was HIGH)
@@ -125,25 +124,23 @@ contact policy/v2 ticket design is future work.
 
 Test: `direct_mode_queue_does_not_share_the_relay_post_rate`.
 
-## Documented v1 limitations (not fixed in this release)
+## Remaining limitations
 
-### 7. Relay can test whether a known address signed an envelope (MEDIUM)
+### 7. Relay sender-candidate check — fixed by envelope v2 (was MEDIUM)
 
-Envelope v1 carries an outer ed25519 signature by the sender key. A relay
-(anyone who sees the envelope) can take a candidate sender address (ed25519
-public key), recompute the envelope transcript and verify the signature. This
-confirms that the candidate sent a message of that size at that time to the
-recipient, even though sender/recipient/payload are otherwise encrypted.
+Envelope v1 carries an outer ed25519 signature by the sender key. A relay or any
+observer could take a candidate sender address, recompute the public transcript
+and verify the signature, confirming that the candidate sent a message of that
+size at that time.
 
-Why not fixed here: moving sender authentication inside the encrypted payload is
-a protocol change (envelope v2 + mixed-version relays/clients, new vectors). It
-is the correct direction, not a patch. Recommendations for now:
-
-- for sender-relay unlinkability use **direct mode** (no relay sees the
-  envelope; only the recipient/onion service does);
-- use a relay you control or a trusted one for relay mode;
-- treat "relay cannot read payload" as confidentiality, **not** sender
-  anonymity. This is now stated in `docs/PROTOCOL.md` and the README.
+Envelope **v2** moves sender authentication inside the encrypted payload: the
+sender signs a domain-separated transcript over sender/recipient/id/time/kind,
+and the recipient verifies it after decryption. The outer `signature` field is
+`[0;64]` and unused for v2, so a relay cannot test a candidate sender against the
+wire. `Envelope::open` still accepts legacy v1 envelopes; those retain the old
+candidate-check leak, and `seal_legacy_v1` exists only for interoperability.
+New messages use v2, and v1-only clients cannot open v2 (documented in
+`docs/PROTOCOL.md` §10). Relay mode still exposes recipient/size/time metadata.
 
 ### 8. Address-key reuse links messenger/onion to the payment address (MEDIUM, conditional)
 
@@ -180,7 +177,7 @@ only together with a dependency update and a passing full CI run. Informational
 
 ## Verification
 
-- `cargo test --workspace` — 154 passed, 0 failed, 2 ignored (see
+- `cargo test --workspace` — 156 passed, 0 failed, 2 ignored (see
   `29-security-tests.log` in the evidence directory; ignore count is the live
   Nostr test and the real-relay process test, both run separately);
 - `cargo test -p flint-gateway --test relay_live -- --ignored` — PASS with the

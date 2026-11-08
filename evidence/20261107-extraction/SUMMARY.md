@@ -48,6 +48,28 @@ binds, and the daemon takes the seed from a file/env/identity file (or generates
 one explicitly). Contract: [docs/WALLET_INTEGRATION.md](../../docs/WALLET_INTEGRATION.md).
 Evidence: [26-wallet-tests.log](26-wallet-tests.log), [27-wallet-demo.log](27-wallet-demo.log).
 
+## Envelope v2 (2026-11-08)
+
+Envelope **v2** moves the sender's ed25519 authentication inside the encrypted
+payload (domain-separated sender transcript over sender/recipient/id/time/ttl/
+kind), so a relay or wire observer cannot test a known candidate sender against
+the public envelope. The outer `signature` field is `[0;64]` for v2 and unused;
+`Envelope::open` still accepts legacy v1 envelopes (which retain the old
+candidate-check leak), and `seal_legacy_v1` exists for interoperability tests.
+New clients send v2; v1-only clients cannot open v2 messages (documented in
+PROTOCOL §10). Evidence: [32-envelope-v2-tests.log](32-envelope-v2-tests.log),
+[33-envelope-v2-demo.log](33-envelope-v2-demo.log).
+
+## Release / CI (2026-11-08)
+
+GitHub Actions `ci` runs a Windows+Linux build/test matrix, `cargo fmt --check`,
+`cargo clippy --workspace --all-targets -- -D warnings`, the real `relay_live`
+process test, and `cargo audit` with documented advisory exceptions. The `release`
+workflow publishes both platform bundles, per-platform `SHA256SUMS-*.txt`,
+`Cargo.lock.release` and a CycloneDX SBOM. First release:
+<https://github.com/DanilaGrinRus/GrinMessenger/releases/tag/v0.1.0>. See
+[docs/RELEASE.md](../../docs/RELEASE.md).
+
 ## Security hardening (2026-11-08)
 
 Audit findings and residual risks are tracked in
@@ -70,10 +92,10 @@ Audit findings and residual risks are tracked in
 - **Wallet console**: loopback `Host`/`Origin`/JSON guard and server-side token
   injection (the browser never sees the bearer token).
 
-Residual v1 limitations (documented, not silently claimed away): envelope v1's
-outer sender signature lets a relay test a known candidate sender; reusing the
-wallet address-key seed links messenger/onion to the payment address; a sustained
-direct-mode flood can still delay delivery (no per-sender authenticated quota).
+Residual limitations: legacy v1 envelopes (sender candidate check), address-key
+reuse (online-time linkability), a sustained direct-mode flood can still delay
+delivery (no per-sender authenticated quota), and the v1-only client
+compatibility gap.
 
 ## Live Tor fix (2026-11-08)
 
@@ -90,14 +112,18 @@ fix delivered a direct onion message end to end.
 | Check | Result |
 |---|---|
 | Offline build (`cargo build --workspace --offline --locked`) | **PASS** (exit 0) |
-| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 154 passed, 0 failed, 2 ignored |
+| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 156 passed, 0 failed, 2 ignored |
 | `cargo fmt --check` | **PASS** |
+| `cargo clippy --workspace --all-targets -- -D warnings` | **PASS** |
+| CI: Windows + Linux build/test/clippy matrix, dependency audit | **PASS** (GitHub Actions `ci` workflow; audit exceptions documented in `docs/SECURITY.md`) |
 | Ignored `relay_live` test (spawns the real hardened `flint-relay` process) | **PASS**, 1 passed |
 | Web-UI integration tests (real relay + real `flintmsg-ui` process, browser guard) | **PASS**, 4 passed |
 | Web-UI demo (relay loopback, CLI peer ↔ browser, screenshot) | **PASS**: delivery both ways, signed ACK, contact + transcript export |
 | Wallet integration tests (two real `flintmsg-walletd` processes + real relay) | **PASS**, 3 integration + 12 unit tests: text and encrypted Slatepack delivery, contacts, unread/read, event cursors, bearer auth, validation |
 | Wallet web console tests (page/proxy/token non-exposure/DNS-rebinding guard) | **PASS**, 3 integration + 2 unit tests; [28-wallet-ui-demo.log](28-wallet-ui-demo.log) |
 | Security hardening tests (signed fetch proof, canonical UUIDs, direct-mode burst, private files, UI/console guard) | **PASS**, covered by the workspace suite and the real relay process; [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
+| Envelope v2 (sender proof inside ciphertext, v1 compatibility) | **PASS**: v2 roundtrip, zero outer signature, candidate-sender check impossible for v2, forged sender proof rejected, legacy v1 open/tamper tests; [32-envelope-v2-tests.log](32-envelope-v2-tests.log), [33-envelope-v2-demo.log](33-envelope-v2-demo.log) |
+| Release pipeline: GitHub Release `v0.1.0` with Linux/Windows binaries, per-platform SHA-256, `Cargo.lock.release`, CycloneDX SBOM | **PASS** ([release](https://github.com/DanilaGrinRus/GrinMessenger/releases/tag/v0.1.0)) |
 | **Live Tor** (cross-process direct onion on a GCP VM) | **PASS** (2026-11-08): Arti bootstrapped 100%, `flintmsg serve` published an onion, `flintmsg send` delivered a direct onion envelope, the receiver opened it and sent a signed ACK; log [25-live-tor-gcp.log](25-live-tor-gcp.log). The local build sandbox has no Tor egress. |
 | Two-process loopback E2E (`flint-relay` + `flintmsg keygen/send/fetch`) | **PASS**: delivery, open, signed ACK, empty re-fetch, offline send fails |
 | Independent verification (separate agent, own build dir) | **PASS**, no P0–P2 defects; 9 findings fixed and re-checked |
@@ -125,9 +151,13 @@ is intentionally excluded). Its SHA-256 is stored in
 - Wallet integration transports wallet-provided Slatepack armor only: no wallet
   RPC, no automatic transaction processing, one identity per daemon, no iOS/FFI
   build in this version.
-- Envelope v1 sender anonymity against a relay is not provided (public outer
-  signature); address-key reuse for the messenger is discouraged (online-time
-  linkability); direct mode can still be flooded (queue is finite).
+- Envelope v2 hides the sender from a relay/wire observer; legacy v1 envelopes
+  still expose the candidate-check leak and v1-only clients cannot open v2
+  messages.
+- Address-key reuse links the messenger onion to the payment address; derive a
+  dedicated messaging seed.
+- Direct-mode delivery is finite-capacity: a sustained flood can still delay
+  messages (no sender-authenticated quota in v1).
 - No forward secrecy, no groups/attachments, no offline guarantee.
 - Not audited; DEV/testnet tool; no mainnet readiness claim.
 - Extraction evidence and reports are in Russian (historical artifacts).

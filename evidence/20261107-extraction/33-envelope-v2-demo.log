@@ -1,0 +1,17 @@
+   Compiling flint-messenger v0.1.0 (C:\DHW\GrinMessageModule\crates\flint-messenger)
+    Finished `dev` profile [unoptimized] target(s) in 2.71s
+     Running `target\debug\examples\envelope_v2_demo.exe`
+=== envelope v2 ===
+version: 2
+outer signature (must be zero/empty proof): "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+sender address in wire: false
+recipient in wire: true
+recipient opened sender: true
+relay can test a known sender candidate: no (no public sender proof)
+
+=== legacy envelope v1 ===
+version: 1
+outer signature non-zero: true
+outer signature field: "UOc3hSviCtLxubnK+K4YBcBpCBw1J0fGBtI0yurjs44wzfuddQHwdXL80vbvs4qRBxg8hxYkNYxWGjkT1QblAg=="
+v1 still opens: true
+v1 caveat: relay/observer can test a candidate sender against the public signature

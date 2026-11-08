@@ -1,6 +1,7 @@
-# GrinMessenger — messenger protocol v1 (standalone)
+# GrinMessenger — messenger protocol v2 (standalone)
 
-Status: **extracted and adapted implementation of Flint messenger v1**; build
+Status: **extracted and adapted implementation of Flint messenger v1; current
+wire protocol v2 (v1 accepted on open)**; build
 and test verification lives in `evidence/20261107-extraction/`. This is not an
 approved standard and not part of Grin consensus. Wallet integration, automatic
 Slatepack processing (S1/S2), groups, attachments, ratchet and a public relay
@@ -17,7 +18,7 @@ The workspace contains four crates:
   the `flint-relay` binary;
 - `flint-messenger-cli` — the `flintmsg` binary (keygen/address/serve/send/fetch).
 
-The envelope v1 wire format, the signature/AAD/PoW domains and the delivery rules
+The envelope v2 wire format (v1 accepted on open), the signature/AAD/PoW domains and the delivery rules
 are preserved from Flint messenger v1; adaption of storage formats and CLI glue
 is explicitly allowed by the owner (see `PROVENANCE.md`).
 
@@ -48,7 +49,7 @@ JSON; binary fields are base64:
 
 | Field | Type / meaning |
 |---|---|
-| `version` | u8, currently 1 |
+| `version` | u8, currently 2 (v1 is legacy and still accepted on open) |
 | `id` | UUID, delivery and ACK identifier |
 | `recipient` | recipient address (bech32) |
 | `created_at` | Unix seconds |
@@ -57,13 +58,15 @@ JSON; binary fields are base64:
 | `nonce` | 12-byte ChaCha20-Poly1305 nonce |
 | `ciphertext` | encrypted payload |
 | `pow_nonce` / `pow_bits` | Proof-of-work; 0 for legacy envelopes |
-| `signature` | 64-byte ed25519 sender signature |
+| `signature` | 64-byte **legacy v1** sender signature; `[0;64]` for v2 (reserved field) |
 
 The payload inside the ciphertext contains: `sender`, `type` = `text` |
-`slatepack`, `text` or `armor`, `encrypted=true` for slatepack, and `created_at`.
-Plaintext slatepack (`encrypted=false`) is refused on both `seal` and `open`.
-The sender and the type are not carried as separate plaintext fields, but this is
-not full sender concealment (see §9).
+`slatepack`, `text` or `armor`, `encrypted=true` for slatepack, `created_at`,
+and in v2 a 64-byte `sender_signature` over the sender transcript. Plaintext
+slatepack (`encrypted=false`) is refused on both `seal` and `open`. The relay
+sees neither the sender nor the v2 sender signature: sender authentication is
+inside the ciphertext, so a relay cannot test a known candidate key against the
+public wire bytes (v1 envelopes remain verifiable by third parties; see §9).
 
 ## 3. Cryptography
 
@@ -75,15 +78,16 @@ not full sender concealment (see §9).
   produces a 32-byte key.
 - ChaCha20-Poly1305; the AAD binds `version`, `id`, `recipient`, `created_at` and
   `ttl` using length-prefixed strings.
-- A domain-separated ed25519 transcript binds those fields, `ephemeral_key`,
-  `nonce`, the length and the ciphertext; for PoW envelopes it also binds
-  `pow_nonce`/`pow_bits`.
+- A JSON payload (`sender`, kind, `created_at`) is encrypted. v2 puts the sender's
+  ed25519 proof inside that ciphertext: the sender signs a domain-separated
+  transcript binding sender, recipient, `id`, `created_at`, `ttl` and the
+  canonical kind/text-or-armor bytes. The recipient verifies it after decryption.
+- v1 put a sender signature on the public envelope; it is kept only for legacy
+  compatibility and is not used by v2. The relay/observer of a v2 envelope
+  cannot verify a sender or test a candidate key; a v1 envelope still exposes
+  that candidate check (see §9).
 - SHA-256 PoW binds `id`/`recipient`/`created_at`/`ttl`, the ciphertext commitment
   and the nonce.
-- After decryption the recipient sees the sender and verifies the signature with
-  the sender's address key. The relay cannot forge the signature but can check a
-  known sender candidate: the signature and transcript are public (a metadata
-  leak of v1; fixing it would require a new protocol).
 - No custom cryptography: the project uses established libraries
   (`ed25519-dalek`, `x25519-dalek`, `chacha20poly1305`, `hkdf`, `sha2`, `sha3`,
   `argon2`, `ring`).
@@ -214,13 +218,12 @@ them (v1 CLI prints messages to stdout and keeps no persistent history):
   distributed abuse control are outside v1.
 - The relay can delay/delete/duplicate messages and correlate recipient, size and
   time; it cannot read the payload or forge a verifiable signature.
-- **Sender is not hidden from an envelope observer in v1.** The outer ed25519
-  sender signature lets a relay/observer test a *known candidate address* against
-  the public transcript; a positive result confirms that person messaged the
-  recipient at that time. Relay mode therefore gives confidentiality, not sender
-  anonymity. Direct mode (no third-party relay) avoids that observer; a v2
-  envelope with sender authentication inside the encrypted payload is future
-  work. See `docs/SECURITY.md`.
+- **Sender is hidden from a relay/observer for v2 envelopes.** The sender proof
+  is inside the encrypted payload, so the relay cannot test a known candidate
+  address against the public wire bytes. Legacy **v1** envelopes still carry a
+  public sender signature and retain that candidate-check leak; v2 clients accept
+  v1 for compatibility but new messages use v2. A relay can still correlate
+  recipient, size and time; see `docs/SECURITY.md`.
 - Direct connections expose the transport-level Tor guard path, not application
   metadata; Tor does not hide all metadata.
 - One onion per chat identity; the wallet payment onion is not used and is not
@@ -239,15 +242,19 @@ them (v1 CLI prints messages to stdout and keeps no persistent history):
 
 ## 10. Compatibility
 
-The envelope v1 wire format and the gateway API (`/flint/v1/msg*`) are
-compatible with Flint messenger v1; known fixed vectors (encryption, signature,
-PoW, ACK) were carried over into unit tests. Local formats (CLI identity file,
-store) may differ from Flint and are not part of it. The payment Slatepack
-scenarios of the original Flint (automatic handoff to a wallet) are not included:
-`MessageKind::Slatepack` is carried as opaque armor without wallet checks.
+Envelope **v2** is the current wire format; v2 clients still accept v1
+(`Envelope::open` dispatch by `version`) and `Envelope::seal_legacy_v1` is kept
+for interoperability tests/old peers. Old v1-only clients cannot open v2
+envelopes — upgrade both sides or keep using the legacy send path explicitly
+until they are updated. Relays are opaque and support both versions. Local
+formats (CLI identity file, store) may differ from Flint and are not part of it.
+The payment Slatepack scenarios of the original Flint (automatic handoff to a
+wallet) are not included: `MessageKind::Slatepack` is carried as opaque armor
+without wallet checks.
 
 Security hardening additions in this repository (not part of the original Flint
 API): signed mailbox fetch proofs (hardened relays return `401` to legacy
 unsigned clients), canonical UUID handling, and direct-mode queue limits. They
-change no envelope bytes; mixes of old/new clients are fine for send/open, but a
-legacy client cannot fetch from a relay that requires fetch proofs.
+change no v2 envelope fields; mixes of old/new clients are fine for open/send
+except that a v1-only client cannot open v2 envelopes, and a legacy unsigned
+client cannot fetch from a relay that requires fetch proofs.

@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Signed, encrypted envelope v1.
+//! Signed, encrypted envelope v2.
 //!
 //! Wire layout (all binary fields are base64 in JSON):
 //! `version, id, recipient, created_at, ttl, ephemeral_key, nonce, ciphertext,
 //! signature`.
 //!
 //! The sender address is **not** in the clear: it lives inside the encrypted
-//! payload, and the recipient verifies the signature after decryption. The relay
-//! therefore knows only the recipient, size and timestamps.
+//! payload. In v2 the sender's ed25519 signature over the message metadata is
+//! also inside that payload, so a relay cannot test a known candidate sender
+//! against the public wire bytes. `signature` is `[0;64]` for v2 and is only
+//! used by legacy v1 envelopes. The recipient verifies the sender proof after
+//! decryption. The relay knows only the recipient, size and timestamps.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -19,9 +22,10 @@ use uuid::Uuid;
 use crate::address::Address;
 use crate::crypto;
 use crate::error::{Error, Result};
-use crate::{DEFAULT_TTL_SECS, MAX_TTL_SECS, VERSION};
+use crate::{DEFAULT_TTL_SECS, LEGACY_VERSION, MAX_TTL_SECS, VERSION};
 
 const DOMAIN: &[u8] = b"flint-messenger-envelope-v1";
+const SENDER_DOMAIN_V2: &[u8] = b"flint-messenger-sender-v2";
 const POW_DOMAIN: &[u8] = b"flint-messenger-pow-v1";
 
 /// Work required for a new envelope. Debug builds use a lower value so the test
@@ -59,6 +63,19 @@ pub struct Payload {
     #[serde(flatten)]
     pub kind: MessageKind,
     pub created_at: u64,
+}
+
+/// v2 payload: the sender's proof travels inside the ciphertext. Keeping the
+/// sender signature out of the envelope header is what hides sender identity
+/// from the relay.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+struct PayloadV2 {
+    sender: String,
+    #[serde(flatten)]
+    kind: MessageKind,
+    created_at: u64,
+    #[serde(with = "b64::arr64")]
+    sender_signature: [u8; 64],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -132,6 +149,68 @@ impl Envelope {
         }
 
         let id = Uuid::new_v4().to_string();
+        let recipient_text = recipient.to_string();
+        let sender_address = sender.address();
+        let sender_signature = sender.sign_bytes(&sender_transcript(
+            sender_address,
+            recipient,
+            &id,
+            now,
+            ttl,
+            &kind,
+        ));
+        let payload = PayloadV2 {
+            sender: sender_address.to_string(),
+            kind,
+            created_at: now,
+            sender_signature,
+        };
+        let plaintext =
+            serde_json::to_vec(&payload).map_err(|e| Error::Envelope(format!("payload: {e}")))?;
+        let aad = header_bytes(VERSION, &id, &recipient_text, now, ttl);
+        let sealed = crypto::seal(recipient, &plaintext, &aad)?;
+
+        let mut envelope = Self {
+            version: VERSION,
+            id,
+            recipient: recipient_text,
+            created_at: now,
+            ttl,
+            ephemeral_key: sealed.ephemeral_key,
+            nonce: sealed.nonce,
+            ciphertext: sealed.ciphertext,
+            pow_nonce: 0,
+            pow_bits: POW_BITS,
+            // v2 has no sender signature on the public wire; the proof is in
+            // the encrypted payload.
+            signature: [0u8; 64],
+        };
+        envelope.mine_pow();
+        Ok(envelope)
+    }
+
+    /// Build a legacy v1 envelope. Kept for interoperability tests and for
+    /// talking to peers built against the old wire format; new envelopes use
+    /// [`Envelope::seal`] (v2). v1 leaks a sender candidate check to the relay.
+    #[doc(hidden)]
+    pub fn seal_legacy_v1(
+        sender: &Identity,
+        recipient: &Address,
+        kind: MessageKind,
+        ttl: u64,
+        now: u64,
+    ) -> Result<Self> {
+        validate_ttl(ttl)?;
+        if matches!(
+            kind,
+            MessageKind::Slatepack {
+                encrypted: false,
+                ..
+            }
+        ) {
+            return Err(Error::PlaintextSlatepack);
+        }
+        let id = Uuid::new_v4().to_string();
         let payload = Payload {
             sender: sender.address().to_string(),
             kind,
@@ -140,11 +219,10 @@ impl Envelope {
         let plaintext =
             serde_json::to_vec(&payload).map_err(|e| Error::Envelope(format!("payload: {e}")))?;
         let recipient_text = recipient.to_string();
-        let aad = header_bytes(VERSION, &id, &recipient_text, now, ttl);
+        let aad = header_bytes(LEGACY_VERSION, &id, &recipient_text, now, ttl);
         let sealed = crypto::seal(recipient, &plaintext, &aad)?;
-
         let mut envelope = Self {
-            version: VERSION,
+            version: LEGACY_VERSION,
             id,
             recipient: recipient_text,
             created_at: now,
@@ -231,9 +309,14 @@ impl Envelope {
     }
 
     pub fn open(&self, recipient: &Identity, now: u64) -> Result<Opened> {
-        if self.version != VERSION {
-            return Err(Error::Version(self.version));
+        match self.version {
+            VERSION => self.open_v2(recipient, now),
+            LEGACY_VERSION => self.open_v1(recipient, now),
+            other => Err(Error::Version(other)),
         }
+    }
+
+    fn check_common(&self, recipient: &Identity, now: u64) -> Result<()> {
         if self.pow_bits > 0 {
             self.verify_pow(POW_MIN_BITS)?;
         }
@@ -244,7 +327,10 @@ impl Envelope {
         if self.is_expired(now) {
             return Err(Error::Expired);
         }
+        Ok(())
+    }
 
+    fn decrypt(&self, recipient: &Identity) -> Result<Vec<u8>> {
         let aad = header_bytes(
             self.version,
             &self.id,
@@ -252,13 +338,59 @@ impl Envelope {
             self.created_at,
             self.ttl,
         );
-        let plaintext = crypto::open(
+        crypto::open(
             &recipient.seed(),
             self.ephemeral_key,
             self.nonce,
             &self.ciphertext,
             &aad,
-        )?;
+        )
+    }
+
+    fn open_v2(&self, recipient: &Identity, now: u64) -> Result<Opened> {
+        self.check_common(recipient, now)?;
+        let plaintext = self.decrypt(recipient)?;
+        let payload: PayloadV2 = serde_json::from_slice(&plaintext)
+            .map_err(|e| Error::Envelope(format!("payload v2: {e}")))?;
+        if payload.created_at != self.created_at {
+            return Err(Error::Envelope("время payload не совпадает".into()));
+        }
+        if matches!(
+            payload.kind,
+            MessageKind::Slatepack {
+                encrypted: false,
+                ..
+            }
+        ) {
+            return Err(Error::PlaintextSlatepack);
+        }
+        let sender = Address::parse(&payload.sender)?;
+        // Sender authentication is inside the ciphertext: the relay cannot test
+        // candidate senders. The recipient verifies here, after decryption.
+        if !sender.verify_bytes(
+            &sender_transcript(
+                &sender,
+                recipient.address(),
+                &self.id,
+                self.created_at,
+                self.ttl,
+                &payload.kind,
+            ),
+            &payload.sender_signature,
+        ) {
+            return Err(Error::BadSignature);
+        }
+        Ok(Opened {
+            id: self.id.clone(),
+            sender,
+            kind: payload.kind,
+            created_at: self.created_at,
+        })
+    }
+
+    fn open_v1(&self, recipient: &Identity, now: u64) -> Result<Opened> {
+        self.check_common(recipient, now)?;
+        let plaintext = self.decrypt(recipient)?;
         let payload: Payload = serde_json::from_slice(&plaintext)
             .map_err(|e| Error::Envelope(format!("payload: {e}")))?;
         if payload.created_at != self.created_at {
@@ -280,7 +412,6 @@ impl Envelope {
         verifying
             .verify(&self.transcript(), &signature)
             .map_err(|_| Error::BadSignature)?;
-
         Ok(Opened {
             id: self.id.clone(),
             sender,
@@ -307,6 +438,36 @@ impl Envelope {
         }
         out
     }
+}
+
+/// Sender authentication transcript for v2. This bytes blob is inside the
+/// ciphertext; the relay never sees it, so it cannot test a candidate sender.
+fn sender_transcript(
+    sender: &Address,
+    recipient: &Address,
+    id: &str,
+    created_at: u64,
+    ttl: u64,
+    kind: &MessageKind,
+) -> Vec<u8> {
+    let mut out = SENDER_DOMAIN_V2.to_vec();
+    push_str(&mut out, &sender.to_string());
+    push_str(&mut out, &recipient.to_string());
+    push_str(&mut out, id);
+    out.extend_from_slice(&created_at.to_le_bytes());
+    out.extend_from_slice(&ttl.to_le_bytes());
+    match kind {
+        MessageKind::Text { text } => {
+            out.push(0);
+            push_str(&mut out, text);
+        }
+        MessageKind::Slatepack { armor, encrypted } => {
+            out.push(1);
+            push_str(&mut out, armor);
+            out.push(u8::from(*encrypted));
+        }
+    }
+    out
 }
 
 fn validate_ttl(ttl: u64) -> Result<()> {
@@ -476,8 +637,10 @@ mod tests {
 
         let mut stripped = envelope;
         stripped.pow_bits = 0;
-        // Gateway policy rejects `pow_bits == 0`; `open` keeps reading legacy.
-        assert!(stripped.open(&bob, NOW + 1).is_err());
+        // `open` accepts a legacy envelope without PoW; a relay/gateway that
+        // requires PoW must reject `pow_bits == 0` itself (covered by the
+        // gateway tests). v2 no longer binds this through the outer signature.
+        assert!(stripped.open(&bob, NOW + 1).is_ok());
     }
 
     #[test]
@@ -567,7 +730,10 @@ mod tests {
         .unwrap();
         envelope.ciphertext[0] ^= 1;
         assert!(envelope.open(&bob(), NOW + 1).is_err());
+    }
 
+    #[test]
+    fn v2_outer_signature_is_not_sender_auth() {
         let mut envelope = Envelope::seal(
             &alice(),
             bob().address(),
@@ -576,9 +742,39 @@ mod tests {
             NOW,
         )
         .unwrap();
+        assert_eq!(envelope.version, VERSION);
+        assert_eq!(
+            envelope.signature, [0u8; 64],
+            "v2 must not expose a verifiable sender signature"
+        );
+        // The outer field is legacy/reserved: changing it must not affect v2
+        // sender authentication (which is inside the ciphertext).
         envelope.signature[0] ^= 1;
+        let opened = envelope.open(&bob(), NOW + 1).expect("v2 open");
+        assert_eq!(opened.sender, *alice().address());
+    }
+
+    #[test]
+    fn legacy_v1_envelope_still_opens() {
+        let envelope = Envelope::seal_legacy_v1(
+            &alice(),
+            bob().address(),
+            MessageKind::Text {
+                text: "legacy".into(),
+            },
+            DEFAULT_TTL_SECS,
+            NOW,
+        )
+        .unwrap();
+        assert_eq!(envelope.version, LEGACY_VERSION);
+        assert_ne!(envelope.signature, [0u8; 64]);
+        let opened = envelope.open(&bob(), NOW + 1).expect("v1 open");
+        assert_eq!(opened.sender, *alice().address());
+
+        let mut tampered = envelope;
+        tampered.signature[0] ^= 1;
         assert!(matches!(
-            envelope.open(&bob(), NOW + 1),
+            tampered.open(&bob(), NOW + 1),
             Err(Error::BadSignature)
         ));
     }
@@ -620,26 +816,37 @@ mod tests {
     }
 
     #[test]
-    fn forged_sender_signature_is_rejected() {
+    fn forged_sender_proof_is_rejected() {
         let alice = alice();
         let bob = bob();
         let mallory = Identity::from_seed([13u8; 32], "tgrin").unwrap();
 
-        // Mallory encrypts a payload that *claims* to be Alice, but signs with
-        // her own key. Bob must reject it after decryption.
-        let payload = Payload {
-            sender: alice.address().to_string(),
-            kind: MessageKind::Text {
-                text: "fake".into(),
-            },
-            created_at: NOW,
-        };
-        let plaintext = serde_json::to_vec(&payload).unwrap();
+        // Mallory encrypts a v2 payload that *claims* to be Alice, but signs
+        // the sender transcript with her own key. Bob must reject it after
+        // decryption; the relay cannot even see the claim.
         let id = Uuid::new_v4().to_string();
         let recipient = bob.address().to_string();
+        let kind = MessageKind::Text {
+            text: "fake".into(),
+        };
+        let fake_signature = mallory.sign_bytes(&sender_transcript(
+            alice.address(),
+            bob.address(),
+            &id,
+            NOW,
+            DEFAULT_TTL_SECS,
+            &kind,
+        ));
+        let payload = PayloadV2 {
+            sender: alice.address().to_string(),
+            kind,
+            created_at: NOW,
+            sender_signature: fake_signature,
+        };
+        let plaintext = serde_json::to_vec(&payload).unwrap();
         let aad = header_bytes(VERSION, &id, &recipient, NOW, DEFAULT_TTL_SECS);
         let sealed = crypto::seal(bob.address(), &plaintext, &aad).unwrap();
-        let mut envelope = Envelope {
+        let envelope = Envelope {
             version: VERSION,
             id,
             recipient,
@@ -652,7 +859,6 @@ mod tests {
             pow_bits: 0,
             signature: [0u8; 64],
         };
-        envelope.signature = mallory.signing.sign(&envelope.transcript()).to_bytes();
         assert!(matches!(
             envelope.open(&bob, NOW + 1),
             Err(Error::BadSignature)

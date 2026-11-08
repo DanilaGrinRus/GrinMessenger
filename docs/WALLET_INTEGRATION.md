@@ -19,7 +19,7 @@ already-encrypted armor between the two wallets.
 
 | Component | Purpose |
 |---|---|
-| `flint-messenger` | envelope v1 protocol: ed25519 signatures, X25519 + ChaCha20-Poly1305 encryption, PoW, signed ACKs |
+| `flint-messenger` | envelope v2 protocol (v1 compatible): ed25519 signatures, X25519 + ChaCha20-Poly1305 encryption, PoW, signed ACKs |
 | `flint-tor-arti` | in-process Arti: onion service and HTTP-over-Tor |
 | `flint-gateway` (`flint-relay`) | optional store-and-forward relay; sees only opaque envelopes |
 | `flint-messenger-wallet` | **integration layer**: wallet-facing service, seed derivation, encrypted local history/contacts/read markers |
@@ -212,7 +212,7 @@ Response:
  "created_at":1794100000,"expires_at":1794143200}}
 ```
 
-Plaintext Slatepack is refused by protocol v1: the API always sends
+Plaintext Slatepack is refused by the protocol: the API always sends
 `encrypted: true` and the receiving wallet must treat the armor as opaque.
 Invalid kind, empty text/armor, oversized payload, unknown network address or a
 non-ready transport return `400` / `401` with an explanatory error.
@@ -339,7 +339,7 @@ on `wait_ready`.
 - The seed is the identity. Do not log it, send it to telemetry, put it in
   command lines (`--seed-file`/`--seed-env` keep it out of the process table) or
   include it in crash reports.
-- Envelope v1 has **no forward secrecy** and no deniability guarantees; metadata
+- Envelope v2 has **no forward secrecy** and no deniability guarantees; metadata
   (peer addresses, timing) is visible to the relay/direct endpoint as usual.
 - History/contacts are encrypted at rest but not forward-secret; deleting the
   messenger data directory removes the local history but not copies on the peer.
@@ -349,10 +349,11 @@ on `wait_ready`.
   sidecar/embedded client signs automatically, so this is transparent to the
   wallet. Without it an address holder would expose message count/size/time/id
   to anyone who learns the address.
-- Sender anonymity against a relay is a v1 limitation: the outer envelope
-  signature lets a relay test a known candidate address. Relay mode gives
-  confidentiality, not sender anonymity; use direct mode when that matters.
-  Details and the v2 plan: `docs/SECURITY.md` §7.
+- Sender anonymity against a relay is provided by **envelope v2**: the sender
+  proof is inside the ciphertext, so a relay cannot test a known candidate
+  address. Legacy v1 envelopes retain that candidate check; clients in this repo
+  send v2 and accept v1 for compatibility. Details: `docs/PROTOCOL.md` §9 and
+  `docs/SECURITY.md` §7.
 - Direct-mode inbound capacity is finite: the local gateway queue + PoW + poll/ACK
   drain replaces the old shared loopback rate limit (which was a cheap inbound
   DoS), but a sustained flood can still delay delivery. See `docs/SECURITY.md` §6.
@@ -398,7 +399,7 @@ wallet-agnostic and stores only opaque envelopes with TTL/quotas/PoW.
 ## 10. Versioning, compatibility and limits
 
 - API: `/v1`; `GET /v1/capabilities` reports API/protocol versions and limits.
-- Envelope protocol v1; no silent fallback between transports.
+- Envelope protocol v2 (v1 accepted on open); no silent fallback between transports.
 - Limits: text 8 KiB, Slatepack armor 32 KiB, TTL 1 s–7 days, message page 1000,
   event wait ≤30 s, contacts ≤500.
 - Direct-mode startup needs the Tor network; the original offline build sandbox

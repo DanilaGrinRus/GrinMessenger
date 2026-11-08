@@ -73,7 +73,7 @@
         <rect x="26" y="66" width="250" height="120" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)"/>
         <text x="46" y="98" fill="#e9f7ef" font-size="16" font-weight="700">Alice · flintmsg send</text>
         <text x="46" y="124" fill="#9dbdae" font-size="13">identity: tgrin1… (ed25519 seed)</text>
-        <text x="46" y="146" fill="#9dbdae" font-size="13">envelope v1: seal + mine_pow + sign</text>
+        <text x="46" y="146" fill="#9dbdae" font-size="13">envelope v2: seal + mine_pow + sender proof in ciphertext</text>
         <text x="46" y="168" fill="#9dbdae" font-size="13">Arti TorHttpClient</text>
 
         <rect x="326" y="66" width="248" height="120" rx="14" fill="rgba(14,31,25,.85)" stroke="rgba(61,220,151,.34)" stroke-dasharray="6 5"/>
@@ -116,7 +116,7 @@
         <line x1="574" y1="328" x2="624" y2="328" stroke="#9dbdae" stroke-width="2" stroke-dasharray="6 5"/>
         <polygon points="624,328 614,322 614,334" fill="#9dbdae"/>
 
-        <text x="30" y="452" fill="#9dbdae" font-size="14">Envelope v1: ChaCha20-Poly1305 + ed25519 signature + HKDF-SHA256 + SHA-256 PoW.</text>
+        <text x="30" y="452" fill="#9dbdae" font-size="14">Envelope v2: ChaCha20-Poly1305 + sender ed25519 proof inside ciphertext + HKDF-SHA256 + SHA-256 PoW.</text>
         <text x="30" y="478" fill="#9dbdae" font-size="14">The relay cannot read the payload or forge a verifiable signature.</text>
         <text x="30" y="504" fill="#9dbdae" font-size="14">Direct mode needs the recipient online; the relay holds opaque envelopes until TTL.</text>
 
@@ -134,7 +134,7 @@
     <article class="card status-card is-ready">
       <p class="status-tag">Available for testing</p>
       <h2>Build &amp; tests</h2>
-      <p>Offline build and the Rust test suite pass: 154 passed, 0 failed, 2 ignored (including the web-UI, wallet two-daemon and security-guard tests).</p>
+      <p>Offline build and the Rust test suite pass: 156 passed, 0 failed, 2 ignored (including the web-UI, wallet two-daemon, security-guard and envelope-v2 tests).</p>
       <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
     </article>
     <article class="card status-card">
@@ -210,7 +210,7 @@
 
   <section id="protocol">
     <p class="section-kicker">Protocol</p>
-    <h2 class="section-title">Envelope v1 and the gateway API</h2>
+    <h2 class="section-title">Envelope v2 and the gateway API</h2>
     <p class="section-note">
       The wire format is preserved from Flint messenger v1 and covered by fixed
       test vectors. Full contract: <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">docs/PROTOCOL.md</a>.
@@ -219,7 +219,7 @@
       <table class="api">
         <thead><tr><th scope="col">Envelope field</th><th scope="col">Meaning</th></tr></thead>
         <tbody>
-          <tr><td><code>version</code></td><td>u8, currently 1</td></tr>
+          <tr><td><code>version</code></td><td>u8, currently 2 (v1 accepted on open)</td></tr>
           <tr><td><code>id</code></td><td>UUID, delivery and ACK identifier</td></tr>
           <tr><td><code>recipient</code></td><td>bech32 address of the recipient</td></tr>
           <tr><td><code>created_at / ttl</code></td><td>Unix seconds / lifetime in seconds</td></tr>
@@ -474,10 +474,11 @@ let env = msg.send(&amp;id, &amp;recipient,
         <h3 class="ok">Verified</h3>
         <ul>
           <li>Offline build of the whole workspace</li>
-          <li>154 automated tests: protocol, gateway, CLI, web UI, wallet API, console security, onion vectors</li>
+          <li>156 automated tests: protocol, gateway, CLI, web UI, wallet API, console security, envelope v2, onion vectors</li>
           <li>Web UI: session-token + Host/Origin guard; integration tests with a real relay + live browser screenshot</li>
           <li>Wallet integration: two real <code>flintmsg-walletd</code> processes exchange text + encrypted Slatepack through a real relay; console proxy tested</li>
           <li>Security hardening: signed relay fetch proofs, canonical UUIDs, direct-mode queue DoS mitigation, owner-only secret files</li>
+          <li>Envelope v2: sender proof inside ciphertext, relay cannot test a known sender; v1 accepted on open</li>
           <li>Live Tor on a GCP VM: two real processes, direct onion delivery + signed ACK</li>
           <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
           <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
@@ -492,7 +493,7 @@ let env = msg.send(&amp;id, &amp;recipient,
           <li>Live Nostr transport (needs an external relay)</li>
           <li>Forward secrecy, groups, attachments</li>
           <li>Security audit; mainnet use</li>
-          <li>Relay mode: a known sender can be tested against the public v1 signature (not sender-anonymous); use direct mode for that threat</li>
+          <li>Legacy v1 envelopes still expose a public sender candidate check; v1-only clients cannot open v2 messages (upgrade both sides)</li>
           <li>Reusing the wallet address-key seed links messenger/onion to the payment address — dedicated messaging seed only</li>
           <li>Direct-mode sustained flood can still delay delivery (no per-sender authenticated quota in v1)</li>
           <li>Automatic wallet RPC / Slatepack processing — the wallet integration only transports wallet-provided armor</li>
@@ -502,7 +503,7 @@ let env = msg.send(&amp;id, &amp;recipient,
       </article>
     </div>
     <div class="facts">
-      <div class="fact"><strong>154</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
+      <div class="fact"><strong>156</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
       <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
       <div class="fact"><strong>1</strong><span>live Tor run on GCP: two processes, direct onion, signed ACK</span></div>
     </div>

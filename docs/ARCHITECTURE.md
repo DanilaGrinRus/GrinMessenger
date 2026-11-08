@@ -40,7 +40,7 @@ Dependencies are one-directional:
 ```text
 Alice flintmsg send                      Bob flintmsg serve
   Identity(seed→address/onion)            Gateway loopback 127.0.0.1:P
-  envelope v1 (seal+mine_pow+sign)  ──►   OnionService::start(seed, P)
+  envelope v2 (seal+mine_pow; sender proof in ciphertext)  ──►   OnionService::start(seed, P)
   Arti TorHttpClient POST                 onion:80 → 127.0.0.1:P
   http://<bob.onion>/flint/v1/msg         poll loop: GET /flint/v1/msg
                                           envelope open → print → signed ACK
@@ -153,12 +153,11 @@ Key points:
   needed for authentication (the recipient verifies the signature after
   decryption).
 - **Relay**: sees `to`, size and time, can delete/duplicate; it does not see the
-  payload/sender and cannot forge the signature. In envelope v1 the outer sender
-  signature is public: a relay can test a *known candidate address* against it
-  and confirm that the candidate signed a message of that size/time. Relay mode
-  therefore does not provide sender anonymity against the relay; direct mode
-  avoids a third-party envelope observer. A v2 envelope with sender
-  authentication inside the payload is future work (`docs/SECURITY.md`).
+  payload/sender and cannot forge the signature. In envelope **v2** the sender's
+  authentication proof is inside the ciphertext, so a relay cannot test a known
+  candidate address against the public wire; relay mode hides the sender from a
+  third-party relay. Legacy v1 envelopes still carry a public sender signature
+  and retain the candidate-check leak (`docs/SECURITY.md`).
 - **Tor/Arti**: transport confidentiality; the application does not rely on Tor
   for end-to-end encryption (the envelope provides it).
 - **CLI/UI**: the identity file is a secret; CLI stdout and the UI page may

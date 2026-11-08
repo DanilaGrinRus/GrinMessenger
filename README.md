@@ -34,10 +34,10 @@ this is not the Flint wallet.
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 Status (2026-11-08): **extraction, adaptation, a local web UI, wallet
-integration and security hardening are complete; offline build is PASS, 154
-automated tests are PASS (0 failed, 2 ignored), the loopback E2E, real CLI
-processes, the web UI, a two-daemon wallet API run, a wallet web console and a
-live Tor two-peer direct-onion run on a Google Cloud VM are PASS.** The original
+integration, security hardening and envelope v2 are complete; offline build is
+PASS, 156 automated tests are PASS (0 failed, 2 ignored), the loopback E2E, real
+CLI processes, the web UI, a two-daemon wallet API run, a wallet web console and
+a live Tor two-peer direct-onion run on a Google Cloud VM are PASS.** The original
 build sandbox has no Tor egress; live Tor was therefore verified on a GCP VM
 (Ubuntu, Arti bootstrapped 100%, direct onion delivery + signed ACK), see
 [evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
@@ -50,7 +50,7 @@ This is a DEV/testnet tool: not audited, not ready for mainnet.
 
 | Crate | Binary | What it does |
 |---|---|---|
-| `flint-messenger` | — | envelope v1, crypto, PoW, ACK, store/history/contacts, transports (`GatewayTransport`, `DirectOnionTransport`, Nostr) |
+| `flint-messenger` | — | envelope v2 (v1 compatible), crypto, PoW, ACK, store/history/contacts, transports (`GatewayTransport`, `DirectOnionTransport`, Nostr) |
 | `flint-tor-arti` | — | in-process Tor: onion v3 from the ed25519 seed, onion service, HTTP client through Arti |
 | `flint-gateway` | `flint-relay` | loopback gateway / standalone store-and-forward relay without a wallet |
 | `flint-messenger-cli` | `flintmsg` | two-peer CLI: keygen / address / serve / send / fetch |
@@ -120,9 +120,10 @@ Without `--plain`, the CLI goes through Arti and can use a `.onion` relay.
 `flint-relay` enables `require_pow`, `require_signed_ack` and signed mailbox
 fetch proofs (`require_fetch_proof`); messages are opaque envelopes, so the relay
 cannot read the plaintext. In-repo clients sign the mailbox fetch automatically;
-legacy unsigned clients get `401` from a hardened relay. Relay mode conceals the
-payload but not a known sender: envelope v1's outer sender signature lets a relay
-test a candidate address (see [docs/SECURITY.md](docs/SECURITY.md)).
+legacy unsigned clients get `401` from a hardened relay. Envelope v2 keeps sender
+authentication inside the ciphertext, so a relay cannot test a known sender
+against the public wire; legacy v1 envelopes retain that candidate check (see
+[docs/SECURITY.md](docs/SECURITY.md)).
 
 ## Web UI (local browser)
 
@@ -231,7 +232,7 @@ cargo test -p flint-gateway --test relay_live -- --ignored    # spawns flint-rel
 Run results (commands, PASS/FAIL) are in
 [evidence/20261107-extraction/](evidence/20261107-extraction/). Summary:
 `cargo build --workspace --offline --locked` — PASS;
-`cargo test --workspace --offline --locked` — 154 passed / 0 failed / 2 ignored
+`cargo test --workspace --offline --locked` — 156 passed / 0 failed / 2 ignored
 (`relay_live`, live Nostr); `cargo fmt --check` — PASS. The web-UI integration
 tests spawn a real UI process and a real relay; the wallet integration tests
 spawn two real `flintmsg-walletd` processes and a real relay and exchange text +
@@ -261,13 +262,12 @@ that setup shares one Tokio runtime and is not representative of two peers.
 
 ## Limitations and honest claims
 
-- Protocol v1 has no forward secrecy and no post-compromise protection.
+- Protocol v2 has no forward secrecy and no post-compromise protection.
 - Relay/direct delivery exposes metadata (recipient address, size, time); the
   relay cannot read the payload, but it can drop or duplicate messages.
-- **Relay mode does not hide a known sender from the relay**: the public outer
-  envelope signature lets a relay test a candidate address. Use direct mode when
-  sender-relay unlinkability matters; a v2 envelope with sender authentication
-  inside the payload is future work ([docs/SECURITY.md](docs/SECURITY.md)).
+- Envelope v2 hides the sender from the relay (sender proof is inside the
+  ciphertext). Legacy v1 envelopes retain the old candidate-check leak and
+  v1-only clients cannot open v2 messages; upgrade both sides.
 - Direct-mode delivery is finite-capacity: the old shared loopback rate limit was
   replaced by a larger queue + PoW + poll/ACK drain, but a sustained flood can
   still delay messages (no sender-authenticated quota in v1).

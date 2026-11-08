@@ -30,8 +30,8 @@ RPC и платёжной интеграции **не переносился**.
 | GCP (live Tor) | Ubuntu 24.04 VM `grin-linux-build` (e2-medium, us-central1-a), Rust 1.99.1, публичный интернет; репозиторий клонирован с GitHub |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
-| Исходники | 45 `.rs`, 16 221 строк; `Cargo.lock` 556 пакетов; + встроенные `ui.html` / `wallet_ui.html` |
-| Бинари (build output) | `target/debug/flintmsg.exe` 26.99 МБ, `target/debug/flint-relay.exe` 3.25 МБ, `target/debug/flintmsg-ui.exe` 27.10 МБ, `target/debug/flintmsg-walletd.exe` 27.41 МБ, `target/debug/flintmsg-wallet-ui.exe` 5.23 МБ; **в поставку не входят, пересобираются из исходников** |
+| Исходники | 46 `.rs`, 16 505 строк; `Cargo.lock` 556 пакетов; + встроенные `ui.html` / `wallet_ui.html` + пример `envelope_v2_demo` |
+| Бинари (build output) | `target/debug/flintmsg.exe` 27.00 МБ, `target/debug/flint-relay.exe` 3.28 МБ, `target/debug/flintmsg-ui.exe` 27.12 МБ, `target/debug/flintmsg-walletd.exe` 27.42 МБ, `target/debug/flintmsg-wallet-ui.exe` 5.23 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
 | Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 74 файла |
 
@@ -72,14 +72,16 @@ RPC и платёжной интеграции **не переносился**.
 | 23 | Security: direct-mode inbound DoS mitigation (shared loopback rate limit отключён, очередь 500/5000 + PoW + drain) | **PASS**: тест `direct_mode_queue_does_not_share_the_relay_post_rate` (60 сообщений burst + легитимное принято); residual risk в `docs/SECURITY.md` | [29-security-tests.log](29-security-tests.log) |
 | 24 | Security: owner-only secret files (wallet/CLI/UI) + wallet console guard | **PASS**: `secret_file_is_restricted_before_content_is_written`, `identity_seed_file_is_owner_only`, `console_is_guarded_against_dns_rebinding_and_csrf`, `console_refuses_unsafe_configuration`; Windows ACL подтверждён `icacls` | [28-wallet-ui-demo.log](28-wallet-ui-demo.log), [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
 | 25 | Полный прогон после security-фиксов: build/test/fmt `--locked` | **PASS**: **154 passed / 0 failed / 2 ignored**, fmt PASS; `relay_live` PASS | [29-security-tests.log](29-security-tests.log) |
+| 26 | Envelope v2: sender proof inside ciphertext, `[0;64]` outer signature, v1 open compatibility, forged sender proof rejection | **PASS**: 156 passed / 0 failed / 2 ignored после v2; тесты `v2_outer_signature_is_not_sender_auth`, `legacy_v1_envelope_still_opens`, `forged_sender_proof_is_rejected`; demo: v2 wire без sender/signature, v1 открывается | [32-envelope-v2-tests.log](32-envelope-v2-tests.log), [33-envelope-v2-demo.log](33-envelope-v2-demo.log) |
+| 27 | CI/release: Windows+Linux matrix, fmt/clippy/audit, GitHub Release v0.1.0 (binaries, SHA-256, Cargo.lock.release, CycloneDX SBOM) | **PASS**: CI run green (Windows+Linux, audit with documented exceptions); release run green, артефакты и SBOM опубликованы | `docs/RELEASE.md`, [release v0.1.0](https://github.com/DanilaGrinRus/GrinMessenger/releases/tag/v0.1.0) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI, интеграция
-с кошельками (embedded + sidecar API + console) и security-hardening — PASS;
-live Tor (cross-process direct onion на GCP VM) — PASS; известных P0–P2 дефектов
-нет. Остаточные v1-ограничения (sender anonymity против relay, address-key
-reuse, residual direct-flood) явно описаны в `docs/SECURITY.md`; локальная
-песочница сама по себе не имеет Tor-выхода, поэтому live-прогон выполнен на GCP
-и привязан к коммиту.**
+с кошельками (embedded + sidecar API + console), security-hardening, envelope v2
+и CI/release — PASS; live Tor (cross-process direct onion на GCP VM) — PASS;
+известных P0–P2 дефектов нет. Остаточные ограничения: legacy v1 envelopes
+(sender candidate check), address-key reuse (linkability), residual direct-flood;
+они явно описаны в `docs/SECURITY.md`. Локальная песочница сама по себе не имеет
+Tor-выхода, поэтому live-прогон выполнен на GCP и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
 SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
@@ -97,7 +99,7 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
 ### Что именно подтверждено
 
 - сборка всего workspace offline из вендора, `--locked` без расхождений;
-- 154 автотеста: протокол (envelope/crypto/PoW/TTL/ACK/квоты/quarantine),
+- 156 автотестов: протокол (envelope v1+v2/crypto/PoW/TTL/ACK/квоты/quarantine),
   23 теста relay (HTTP API, signed ACK, PoW, лимиты, fetch proof, canonical
   UUID, burst-очередь, restart-персистентность), onion-векторы Tor v3,
   loopback e2e двух идентичностей, CLI-процессы, web-UI guard, wallet API и
@@ -118,8 +120,13 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
   (`flintmsg-wallet-ui`) с proxy-токеном и Host/Origin guard;
 - **security hardening**: signed fetch proof и canonical UUID на реальном relay,
   direct-mode burst без shared rate limit, owner-only secret files (wallet/CLI),
-  UI/console browser guard — [29-security-tests.log](29-security-tests.log),
-  [30-security-demo.log](30-security-demo.log).
+  UI/console browser guard; **envelope v2** (sender proof в ciphertext, v1 open
+  compatibility, wire без публичной sender-подписи); **CI/release** (Windows+
+  Linux matrix, clippy -D warnings, audit, GitHub Release v0.1.0 с бинарями,
+  SHA-256 и SBOM) — [29-security-tests.log](29-security-tests.log),
+  [30-security-demo.log](30-security-demo.log),
+  [32-envelope-v2-tests.log](32-envelope-v2-tests.log),
+  [33-envelope-v2-demo.log](33-envelope-v2-demo.log).
 
 ### Что НЕ подтверждено (честно)
 
@@ -132,12 +139,12 @@ SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
 - **Интеграция с кошельками**: API проверен на двух реальных daemon-процессах и
   реальном relay; автоматическая обработка Slatepack/RPC кошелька и iOS/FFI-сборка
   в эту поставку не входят (слой только транспортирует armor).
-- **Остаточные v1-ограничения**: relay может проверять известного кандидата-
-  отправителя по публичной внешней подписи (sender anonymity против relay не
-  обещается); повторное использование seed адрес-ключа связывает онлайновость
-  onion с платёжным адресом; sustained direct-flood может задерживать доставку
-  (sender-authenticated quotas в v1 нет). Все три пункта явно описаны в
-  `docs/SECURITY.md` и не выдаются за PASS.
+- **Остаточные ограничения**: legacy v1 envelopes сохраняют публичную
+  sender-подпись (candidate check); повторное использование seed адрес-ключа
+  связывает онлайновость onion с платёжным адресом; sustained direct-flood может
+  задерживать доставку (sender-authenticated quotas в v1 нет); v1-only клиенты не
+  открывают v2. Все пункты явно описаны в `docs/SECURITY.md` / `PROTOCOL.md` и не
+  выдаются за PASS.
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
 - **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
   DEV/testnet-инструмент.

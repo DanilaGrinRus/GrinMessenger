@@ -46,5 +46,9 @@ pub use transport::{DirectOnionTransport, GatewayTransport, HttpConnector, TcpCo
 pub const DEFAULT_TTL_SECS: u64 = 26 * 60 * 60;
 /// Hard upper bound accepted by this implementation.
 pub const MAX_TTL_SECS: u64 = 7 * 24 * 60 * 60;
-/// Current envelope version.
-pub const VERSION: u8 = 1;
+/// Current envelope version. v2 moves sender authentication inside the
+/// encrypted payload so a relay cannot test a candidate sender against the
+/// public transcript.
+pub const VERSION: u8 = 2;
+/// Legacy envelope version still accepted by [`Envelope::open`].
+pub const LEGACY_VERSION: u8 = 1;
