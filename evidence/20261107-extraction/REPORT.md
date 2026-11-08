@@ -61,8 +61,8 @@ RPC и платёжной интеграции **не переносился**.
 | 13 | Веб-UI: сборка, тесты (`flint-messenger-ui`), fmt | **PASS**: build EXIT 0; tests **127 passed / 0 failed / 3 ignored** (включая 2 UI интеграционных), fmt EXIT 0 | [21-ui-build.log](21-ui-build.log), [22-ui-tests.log](22-ui-tests.log), [23-ui-fmt.log](23-ui-fmt.log) |
 | 14 | Веб-UI: живое демо на loopback (relay + CLI-пир ↔ браузер), скриншот | **PASS**: 3 входящих + ответ из UI; CLI-пир получил ответ; signed ACK; история/контакты/экспорт; скриншот `docs/assets/ui.png` (1440×900) | [20-ui-demo.log](20-ui-demo.log), [20-ui-state.json](20-ui-state.json) |
 | 15 | GitHub Pages: редеплой сайта с секцией Web UI и скриншотом | **PASS**: run 42425449844 = success (sha e2d4ae6); https://danilagrinrus.github.io/GrinMessenger/ = HTTP 200, секция «Web UI» и `assets/ui.png` на месте | [24-pages-ui.log](24-pages-ui.log) |
-| 16 | GCP VM: клон опубликованного репозитория, сборка на Linux (Ubuntu, Rust 1.99) | **PASS**: `cargo build --workspace` 20m 58s (cold), инкрементальная пересборка после фиксов ~37 с | [23-gcp-build.log](23-gcp-build.log) |
-| 17 | GCP VM: **live Tor/Arti, два реальных процесса** (`flintmsg serve` публикует onion через Arti; `flintmsg send` доставляет direct onion; получатель открывает и шлёт signed ACK) | **PASS** (2026-11-08): Arti bootstrap 100%, onion опубликован, `SEND_EXIT=0`, `RECEIVED=1`, signed ACK; плюс `cargo test --workspace` на Linux — 128/0/2 после фиксов | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
+| 16 | GCP VM: клон опубликованного репозитория, сборка на Linux (Ubuntu, Rust 1.99) | **PASS**: cold build ~20m 58s; чистая пересборка после фиксов 17m 22s; инкрементальная `cargo build` 13.26 s; `BUILD_EXIT=0` | [23-gcp-build.log](23-gcp-build.log) |
+| 17 | GCP VM: **live Tor/Arti, два реальных процесса** (`flintmsg serve` публикует onion через Arti; `flintmsg send` доставляет direct onion; получатель открывает и шлёт signed ACK) + полный `cargo test --workspace` на Linux | **PASS** (2026-11-08): Linux tests **128 passed / 0 failed / 2 ignored**, `WORKSPACE_TEST_EXIT=0`; Arti bootstrap 100%, `BOB_READY=1`, `SENT=1`, `RECEIVED=1`, signed ACK `count=1` | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
 | 18 | Найден и исправлен wire-баг live-режима: hyper отправлял absolute-form request-target, gateway отвечал 404; фикс + регрессионный тест | **PASS**: commit `d828211` (origin-form + Host; gateway принимает absolute-form), тест `absolute_form_request_target_is_routed_correctly`; после фикса direct onion доставка работает | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI и live Tor
@@ -71,7 +71,7 @@ RPC и платёжной интеграции **не переносился**.
 выполнен на GCP и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `b4b35bd9fdb48051692d6628f9d8abb1024fa9f7ab4083384d400c0c9db0318f`
+SHA-256 — `268369efa9c73e6c06015243546a3da7b88fe0595ded7924b2504deee508673d`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
@@ -80,7 +80,7 @@ SHA-256 — `b4b35bd9fdb48051692d6628f9d8abb1024fa9f7ab4083384d400c0c9db0318f`
 > изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
 > добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
 > 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
-> актуальный freeze-манифест — `b4b35bd9…0318f`. VERIFY.md оставлен как
+> актуальный freeze-манифест — `268369ef…8673d`. VERIFY.md оставлен как
 > исторический артефакт.
 
 ### Что именно подтверждено

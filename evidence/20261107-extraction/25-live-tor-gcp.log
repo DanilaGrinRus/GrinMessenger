@@ -1,0 +1,49 @@
+=== GrinMessenger GCP evidence ===
+date: Sun Nov  8 01:00:18 UTC 2026
+host: grin-linux-build Linux 7.0.0-1017-gcp x86_64
+instance: grin-linux-build
+zone: us-central1-a
+repo commit: 42a401082bbff73fa0899c49b02e0ddc5088d639
+cargo: cargo 1.99.1 (5f94df478 2026-08-27)
+
+=== 2) cargo test --workspace (Linux) ===
+running 20 tests
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.47s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 90 tests
+test result: ok. 89 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 98.32s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+running 9 tests
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.79s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+WORKSPACE_TEST_EXIT=0
+
+=== 3) live Tor: two real processes, direct onion delivery + signed ACK ===
+bob address: tgrin1293dvlr3hjvpzfl7gz34epewqqdaq3trfn9zxdlpw48urs2ductszaukw9
+BOB_READY=1
+{"address":"tgrin1293dvlr3hjvpzfl7gz34epewqqdaq3trfn9zxdlpw48urs2ductszaukw9","event":"ready","gateway":"http://127.0.0.1:37409","onion":"kfrnm7drxsmbcj76icrvzbzoaan5arldjtfcgn7bovh4dqkn4ylwkoqd","onion_url":"http://kfrnm7drxsmbcj76icrvzbzoaan5arldjtfcgn7bovh4dqkn4ylwkoqd.onion"}
+--- send attempt 1 ---
+SEND_EXIT=0
+{"event":"sent","id":"6b9310a6-e43e-4c7b-8c49-1f6b3ba52794","remote":"http://kfrnm7drxsmbcj76icrvzbzoaan5arldjtfcgn7bovh4dqkn4ylwkoqd.onion","to":"tgrin1293dvlr3hjvpzfl7gz34epewqqdaq3trfn9zxdlpw48urs2ductszaukw9","via":"direct"}
+SENT=1
+RECEIVED=1
+{"created_at":1794099796,"event":"message","from":"tgrin1nrvsacm2hq8vrufyqm8zjyrj3aq4x725lspvytzv5t2dg7hg67jqrqs3ng","id":"6b9310a6-e43e-4c7b-8c49-1f6b3ba52794","kind":"text","text":"live direct onion from GCP, attempt 1, 2026-11-08T01:03:06Z"}
+{"count":1,"event":"acked"}
+--- bob stderr (tail) ---
+=== done ===

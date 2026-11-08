@@ -1,0 +1,11 @@
+=== GrinMessenger GCP evidence ===
+date: Sun Nov  8 01:00:18 UTC 2026
+host: grin-linux-build Linux 7.0.0-1017-gcp x86_64
+instance: grin-linux-build
+zone: us-central1-a
+repo commit: 42a401082bbff73fa0899c49b02e0ddc5088d639
+cargo: cargo 1.99.1 (5f94df478 2026-08-27)
+
+=== 1) cargo build --workspace (incremental on the pulled commit) ===
+    Finished `dev` profile [unoptimized] target(s) in 13.26s
+BUILD_EXIT=0

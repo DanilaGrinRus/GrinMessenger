@@ -294,7 +294,7 @@ GET  /flint/v1/health       {ok:true}</pre>
           <code>ttl</code>, <code>pow_bits</code>, transport route and payload
           size. The page also exports the transcript as JSON and shows the honest
           transport state (<code>tor</code> / <code>ready</code> /
-          <code>error</code>) without pretending about the transport state.
+          <code>error</code>) and never hides the transport state.
         </p>
         <pre class="code">flintmsg-ui --data ui-data \
   --relay http://127.0.0.1:8080 --plain
