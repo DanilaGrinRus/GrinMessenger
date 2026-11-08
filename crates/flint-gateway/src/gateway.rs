@@ -618,6 +618,22 @@ fn query_param(query: &str, key: &str) -> Option<String> {
     })
 }
 
+/// Reduce an absolute-form request target (`http://host:port/path?query`) to the
+/// origin-form path used by the gateway router. Origin-form targets pass through
+/// unchanged.
+fn normalize_request_target(target: &str) -> String {
+    let rest = target
+        .strip_prefix("http://")
+        .or_else(|| target.strip_prefix("https://"));
+    match rest {
+        Some(rest) => match rest.find('/') {
+            Some(index) => rest[index..].to_string(),
+            None => "/".to_string(),
+        },
+        None => target.to_string(),
+    }
+}
+
 fn read_request(stream: &mut TcpStream) -> Result<(String, String, Vec<u8>)> {
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 4096];
@@ -643,6 +659,11 @@ fn read_request(stream: &mut TcpStream) -> Result<(String, String, Vec<u8>)> {
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default().to_string();
     let path = parts.next().unwrap_or_default().to_string();
+    // Some HTTP clients (hyper sends absolute-form when the request URI carries a
+    // scheme+authority) put the whole URL into the request target. Accept both
+    // origin-form and absolute-form so middleware/proxies cannot turn a valid
+    // `/flint/v1/*` call into a bogus 404.
+    let path = normalize_request_target(&path);
     let length = lines
         .filter_map(|line| line.split_once(':'))
         .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
@@ -1049,6 +1070,44 @@ mod tests {
         assert!(
             response.starts_with("HTTP/1.1 400"),
             "gateway must answer even when the request arrives in chunks: {response}"
+        );
+    }
+
+    #[test]
+    fn absolute_form_request_target_is_routed_correctly() {
+        let (gateway, _url) = start_gateway(GatewayConfig::default());
+
+        let raw_request = |method: &str, target: &str, body: &str| -> String {
+            let mut stream = TcpStream::connect(gateway.addr()).expect("connect");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let request = format!(
+                "{method} {target} HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(request.as_bytes()).unwrap();
+            stream.flush().unwrap();
+            let mut raw = Vec::new();
+            stream.read_to_end(&mut raw).expect("response");
+            String::from_utf8_lossy(&raw).to_string()
+        };
+
+        let health = raw_request("GET", "http://example.test/flint/v1/health", "");
+        assert!(
+            health.starts_with("HTTP/1.1 200"),
+            "absolute-form health request must be routed: {health}"
+        );
+        assert!(health.contains("\"ok\":true"), "health body: {health}");
+
+        let message = raw_request("POST", "http://example.test/flint/v1/msg", "{}");
+        assert!(
+            message.starts_with("HTTP/1.1 400"),
+            "absolute-form POST must reach the route (bad recipient => 400, not 404): {message}"
+        );
+        assert!(
+            message.contains("bad recipient"),
+            "unexpected body: {message}"
         );
     }
 

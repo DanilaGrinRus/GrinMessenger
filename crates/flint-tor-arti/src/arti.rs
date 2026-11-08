@@ -218,6 +218,22 @@ impl TorHttpClient {
             .ok_or_else(|| TorError::Config(format!("URL {url}: нет host")))?
             .to_string();
         let port = uri.port_u16().unwrap_or(80);
+        // Send an origin-form request target (`/path?query`) with an explicit
+        // Host header. Passing the absolute URI to hyper makes it emit
+        // absolute-form (`GET http://host/path`), which is only meant for
+        // proxies and confuses minimal origin servers such as our gateway.
+        let authority = uri
+            .authority()
+            .map(|authority| authority.as_str().to_string())
+            .ok_or_else(|| TorError::Config(format!("URL {url}: нет authority")))?;
+        let host_header = hyper::header::HeaderValue::from_str(&authority)
+            .map_err(|e| TorError::Config(format!("URL {url}: bad host header: {e}")))?;
+        let request_uri: Uri = uri
+            .path_and_query()
+            .map(|path| path.as_str())
+            .unwrap_or("/")
+            .parse()
+            .map_err(|e| TorError::Config(format!("URL {url}: bad path: {e}")))?;
         let method = Method::from_bytes(method.as_bytes())
             .map_err(|e| TorError::Config(format!("HTTP method: {e}")))?;
         let body = body.to_vec();
@@ -244,7 +260,8 @@ impl TorHttpClient {
                     });
                     let request = Request::builder()
                         .method(method)
-                        .uri(uri)
+                        .uri(request_uri)
+                        .header(hyper::header::HOST, host_header)
                         .body(Full::from(Bytes::from(body)))
                         .map_err(|e| TorError::Tor(format!("request: {e}")))?;
                     let response = sender
