@@ -162,6 +162,22 @@ Therefore:
 - never publish the wallet's slatepack address as the messenger address if
   online-time unlinkability matters.
 
+## Dependency audit exceptions
+
+CI runs `cargo audit` (`ci.yml`). Two advisories are explicitly ignored because
+they are inherited from the pinned Arti 0.43 dependency graph and have no
+compatible patched release:
+
+| Advisory | Package/path | Why it is ignored |
+|---|---|---|
+| `RUSTSEC-2023-0071` (Marvin timing attack) | `rsa 0.9.10` via `ssh-key-fork-arti` / `tor-key-forge` | No patched `rsa` release exists (tracking upstream); this project does not perform RSA decryption or expose RSA timing to the network. It is present only in Arti's SSH key parsing path; the messenger uses ed25519/X25519/ChaCha20-Poly1305, not RSA. |
+| `RUSTSEC-2026-0387` (crypto-bigint timing variability) | `crypto-bigint 0.5.5` via the same `rsa` path | Fixed only in 0.7.6, which is incompatible with `rsa 0.9`; same non-network RSA path as above. |
+
+The ignored list is reviewable in `.github/workflows/ci.yml`; remove an ignore
+only together with a dependency update and a passing full CI run. Informational
+`unmaintained` warnings (e.g. `bincode`, `paste` transitively) are reported by
+`cargo audit` but do not fail CI unless they become vulnerabilities.
+
 ## Verification
 
 - `cargo test --workspace` — 154 passed, 0 failed, 2 ignored (see
