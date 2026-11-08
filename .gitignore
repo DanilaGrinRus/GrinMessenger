@@ -5,3 +5,10 @@
 *.pdb
 *.exe
 *.dll
+
+# Local wallet-daemon data and secrets (never commit)
+wallet-data/
+flintmsg-wallet/
+api-token
+*.seed
+seed.hex

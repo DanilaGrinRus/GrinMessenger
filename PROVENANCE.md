@@ -30,7 +30,7 @@ Third-party portions keep their own licenses:
 | Portion | License |
 |---|---|
 | Flint-authored code (`crates/messenger`, `gateway`, relay binary, docs, site) | MIT OR Apache-2.0 |
-| New GrinMessenger code (`crates/flint-messenger-ui`, `flint-messenger-cli`, screenshot, landing-page content) | MIT OR Apache-2.0 |
+| New GrinMessenger code (`crates/flint-messenger-ui`, `crates/flint-messenger-wallet`, `flint-messenger-cli`, screenshot, landing-page content) | MIT OR Apache-2.0 |
 | `flint-tor-arti` Tor integration, adapted from grin-wallet `impls/src/tor/*` | Apache-2.0 (derived from Apache-2.0 code; redistributed under Apache-2.0 and compatible with the project's MIT OR Apache-2.0 licensing) |
 | External crates (arti 0.43, tor-* 0.43, hyper, ring, …) | their own licenses, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `Cargo.lock` |
 
@@ -50,17 +50,18 @@ origin.
 | `crates/core/src/onion.rs` (Arti onion service wrapper) | `crates/flint-tor-arti/src/onion.rs` | adapted |
 | `third_party/grin-wallet/impls/src/tor/arti.rs` | `crates/flint-tor-arti/src/arti.rs` | adapted to stand alone: grin-wallet/grin types replaced with local `TorConfig`, `[u8; 32]` seeds and `TorError`; same arti 0.43 bootstrap, keystore and onion-service mechanics |
 | `third_party/grin-wallet/impls/src/tor/config.rs` (`exp_sec_key_bytes`) | `crates/flint-tor-arti/src/keys.rs` | helper copied (Apache-2.0) |
-| `crates/core/tests/onion_service.rs` | `crates/flint-tor-arti/tests/live_onion.rs` | adapted, `#[ignore]` (needs the Tor network) |
+| `crates/core/tests/onion_service.rs` | — (was `crates/flint-tor-arti/tests/live_onion.rs`) | adapted, `#[ignore]`, then removed: an in-process onion-service + client roundtrip shares one Tokio runtime and is not representative of two peers; live verification is the cross-process run in `evidence/20261107-extraction/25-live-tor-gcp.log` |
 | `docs/contracts/MESSENGER.md` | `docs/PROTOCOL.md` | adapted for the standalone project (wallet/slatepack auto-processing removed, translated to English) |
 | `docs/ARCHITECTURE.md`, `README.md` | `docs/ARCHITECTURE.md`, `README.md` | rewritten for the standalone project in English |
 | `site/en/index.html`, `site/styles.css`, `site/assets/logo.svg` | `site/` | landing page/design adapted for GrinMessenger (new English content and logo, same palette/layout); source assets in the same repository |
 | — (new code, 2026-11-08) | `crates/flint-messenger-ui/`, `docs/assets/ui.png`, `site/assets/ui.png` | local web UI: blocking HTTP server + embedded page, integration tests and a live demo screenshot; not copied from Flint |
+| — (new code, 2026-11-08) | `crates/flint-messenger-wallet/`, `docs/WALLET_INTEGRATION.md` | wallet integration layer: embedded `WalletService`, seed derivation, encrypted history/contacts/read markers, loopback JSON API daemon `flintmsg-walletd`; not copied from Flint, no wallet RPC linked |
 | `crates/core/address.rs`, `crates/core/tor_listener.rs`, `crates/core/tests/direct_onion.rs`, `crates/core/tests/tor_listener_gateway.rs` | — | reference only; external `tor.exe`/SOCKS path is replaced by in-process Arti |
 | `crates/core`, `crates/runtime`, `crates/slint-ui`, `crates/janus`, `crates/transfer-contract`, `third_party/grin-wallet`, `crates/grin-wallet-rpc` | — | **not extracted** (wallet, node, UI, payment and build infrastructure) |
 
 ## Modifications introduced by the extraction
 
-1. Workspace split: a new Cargo workspace with four crates and no wallet, node,
+1. Workspace split: a new Cargo workspace with six crates and no wallet, node,
    Slint UI or grin dependencies.
 2. `flint-messenger`: `HttpConnector`/`TcpConnector` abstraction added so the
    same gateway protocol can run over in-process Arti; legacy constructors and
@@ -86,6 +87,11 @@ origin.
    with an explicit `Host` header, and the gateway accepts absolute-form targets
    too (regression test `absolute_form_request_target_is_routed_correctly`).
    Live-verified with two processes over Tor on a GCP VM.
+10. Wallet integration layer (2026-11-08): `crates/flint-messenger-wallet`
+    provides a wallet-facing `WalletService` (seed derivation, encrypted
+    history/contacts/read markers, message/event cursors) and the
+    `flintmsg-walletd` loopback sidecar API. It transports wallet-provided
+    Slatepack armor opaquely and links no wallet RPC or spending-key code.
 
 ## Reproducing the provenance check
 

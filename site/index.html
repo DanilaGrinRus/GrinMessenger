@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GrinMessenger — encrypted messages for Grin over Tor/Arti</title>
-<meta name="description" content="GrinMessenger is a standalone messaging module for Grin (Mimblewimble): signed and encrypted envelopes delivered directly to a Tor v3 onion by in-process Arti, or through an optional store-and-forward relay. No wallet, no node, no UI. Rust, MIT OR Apache-2.0.">
+<meta name="description" content="GrinMessenger is a standalone messaging module for Grin (Mimblewimble): signed and encrypted envelopes delivered directly to a Tor v3 onion by in-process Arti, or through an optional store-and-forward relay. Wallet integration layer with a loopback sidecar API. Rust, MIT OR Apache-2.0.">
 <meta property="og:title" content="GrinMessenger — encrypted messages for Grin over Tor/Arti">
 <meta property="og:description" content="Signed and encrypted envelopes, direct onion delivery with in-process Arti, optional relay. Rust · Tor v3 · MIT OR Apache-2.0.">
 <meta property="og:type" content="website">
@@ -27,6 +27,7 @@
     <a href="#protocol">Protocol</a>
     <a href="#transports">Transports</a>
     <a href="#webui">Web UI</a>
+    <a href="#wallets">Wallets</a>
     <a href="#quickstart">Quick start</a>
     <a href="#honesty">Honesty</a>
     <a class="gh" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a>
@@ -43,12 +44,14 @@
         GrinMessenger is a standalone messaging module for Grin (Mimblewimble):
         signed and encrypted envelopes delivered directly to a Tor v3 onion by
         <strong>in-process Arti</strong> — or through an optional
-        store-and-forward relay. No wallet, no Grin node, no RPC and no GUI.
+        store-and-forward relay. No wallet, no Grin node, no RPC and no GUI:
+        it is the messaging layer a Grin wallet integrates.
       </p>
       <p class="badges">
         <span class="badge badge-mint">direct onion</span>
         <span class="badge">in-process Arti</span>
         <span class="badge">relay optional</span>
+        <span class="badge">wallet sidecar</span>
         <span class="badge">v1: no forward secrecy</span>
         <span class="badge">not audited</span>
       </p>
@@ -131,7 +134,7 @@
     <article class="card status-card is-ready">
       <p class="status-tag">Available for testing</p>
       <h2>Build &amp; tests</h2>
-      <p>Offline build and the Rust test suite pass: 128 passed, 0 failed, 2 ignored (including the web-UI integration tests).</p>
+      <p>Offline build and the Rust test suite pass: 142 passed, 0 failed, 2 ignored (including the web-UI and wallet two-daemon integration tests).</p>
       <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
     </article>
     <article class="card status-card">
@@ -188,6 +191,13 @@
           contacts and an envelope inspector (id, TTL, PoW bits, route, size).
           No Node.js, no WebView2, no new dependencies; the Rust process is a
           few megabytes and the browser is only the renderer.</p>
+      </article>
+      <article class="card feature">
+        <h3>Wallet integration</h3>
+        <p><code>flint-messenger-wallet</code> embeds in a Rust wallet or runs as
+          the <code>flintmsg-walletd</code> loopback sidecar for C++/Qt wallets:
+          derived messaging identity, encrypted history/contacts, unread counters
+          and a long-poll event API. Slatepack armor is transported opaquely.</p>
       </article>
       <article class="card feature">
         <h3>Honest v1 scope</h3>
@@ -311,6 +321,48 @@ flintmsg-ui --data ui-data</pre>
     </div>
   </section>
 
+  <section id="wallets">
+    <p class="section-kicker">Wallet integration</p>
+    <h2 class="section-title">A messaging layer Grin wallets can embed or spawn</h2>
+    <p class="section-note">
+      Wallet code owns the seed and the transaction logic; GrinMessenger only
+      transports envelopes and encrypted Slatepack armor. Rust wallets embed the
+      typed service; C++/Qt wallets (Grin++) run the loopback sidecar with a
+      bearer token. Contract: <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/WALLET_INTEGRATION.md">docs/WALLET_INTEGRATION.md</a>.
+    </p>
+    <div class="cards-2">
+      <div>
+        <h3>What the wallet gets</h3>
+        <ul>
+          <li>Derived 32-byte messaging seed (HKDF-SHA256, domain-separated) — spending keys never enter the messenger</li>
+          <li>Messenger address in the same <code>bech32(ed25519)</code> format as a Grin slatepack address</li>
+          <li>Encrypted history, contacts and read markers + unread counters</li>
+          <li>Long-poll event cursor (<code>message</code>, <code>rejected</code>, <code>error</code>) and a monotonic <code>seq</code></li>
+          <li>Opaque Slatepack transport: wallet encodes/finalizes, messenger delivers</li>
+        </ul>
+      </div>
+      <div>
+        <pre class="code"># sidecar for a wallet (relay mode, loopback only)
+flintmsg-walletd --data wallet-data\messenger \
+  --seed-file wallet-data\messenger-seed.hex \
+  --network tgrin \
+  --relay http://127.0.0.1:8080 --plain \
+  --listen 127.0.0.1:0
+
+# prints {"event":"ready","api":"http://127.0.0.1:…",
+#         "token_file":"…","address":"tgrin1…"}
+
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:PORT/v1/status</pre>
+        <p class="small-note">
+          Every endpoint except <code>/v1/health</code> needs the bearer token;
+          non-loopback binds are refused. API: status, identity, capabilities,
+          contacts, messages, events, unread, send (text/slatepack), read.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <section id="quickstart">
     <p class="section-kicker">Quick start</p>
     <h2 class="section-title">Build and run in a terminal</h2>
@@ -360,6 +412,16 @@ flintmsg-ui --data ui-data</pre>
           authentication, loopback only. Works without Tor in relay mode.</p>
       </article>
       <article class="card">
+        <h3>Wallet sidecar</h3>
+        <pre class="code">flintmsg-walletd --data wallet-data\messenger \
+  --seed-file wallet-data\messenger-seed.hex \
+  --network tgrin --relay http://127.0.0.1:8080 --plain \
+  --listen 127.0.0.1:0</pre>
+        <p class="small-note">Reads the printed API URL and token file, then talks
+          <code>/v1</code> JSON over loopback. Rust wallets can call
+          <code>WalletService</code> directly instead.</p>
+      </article>
+      <article class="card">
         <h3>Use as a library</h3>
         <pre class="code">use flint_messenger::{Identity, MessageKind, Messenger};
 use flint_messenger::transport::GatewayTransport;
@@ -385,8 +447,9 @@ let env = msg.send(&amp;id, &amp;recipient,
         <h3 class="ok">Verified</h3>
         <ul>
           <li>Offline build of the whole workspace</li>
-          <li>128 automated tests: protocol, gateway, CLI, web UI, onion vectors</li>
+          <li>142 automated tests: protocol, gateway, CLI, web UI, wallet API, onion vectors</li>
           <li>Web UI: integration tests with a real relay + live browser screenshot</li>
+          <li>Wallet integration: two real <code>flintmsg-walletd</code> processes exchange text + encrypted Slatepack through a real relay</li>
           <li>Live Tor on a GCP VM: two real processes, direct onion delivery + signed ACK</li>
           <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
           <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
@@ -401,12 +464,14 @@ let env = msg.send(&amp;id, &amp;recipient,
           <li>Live Nostr transport (needs an external relay)</li>
           <li>Forward secrecy, groups, attachments</li>
           <li>Security audit; mainnet use</li>
-          <li>Persistent history/contacts in the CLI</li>
+          <li>Automatic wallet RPC / Slatepack processing — the wallet integration only transports wallet-provided armor</li>
+          <li>iOS/mobile FFI build (wallet layer is a Rust crate + loopback sidecar)</li>
+          <li>Persistent history in the CLI (the wallet daemon keeps encrypted history)</li>
         </ul>
       </article>
     </div>
     <div class="facts">
-      <div class="fact"><strong>128</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
+      <div class="fact"><strong>142</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
       <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
       <div class="fact"><strong>1</strong><span>live Tor run on GCP: two processes, direct onion, signed ACK</span></div>
     </div>
@@ -425,16 +490,17 @@ let env = msg.send(&amp;id, &amp;recipient,
     <div class="grid grid-3">
       <article class="card">
         <h3>Source</h3>
-        <p>Rust workspace: five crates, pinned <code>Cargo.lock</code>, no vendor
+        <p>Rust workspace: six crates, pinned <code>Cargo.lock</code>, no vendor
           binaries in git.</p>
         <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger">GitHub</a></p>
       </article>
       <article class="card">
         <h3>Docs</h3>
-        <p>Protocol, architecture, provenance, third-party notices and build
-          instructions.</p>
+        <p>Protocol, architecture, wallet integration contract, provenance,
+          third-party notices and build instructions.</p>
         <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">Protocol</a>
-           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/ARCHITECTURE.md">Architecture</a></p>
+           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/WALLET_INTEGRATION.md">Wallet integration</a></p>
       </article>
       <article class="card">
         <h3>Evidence</h3>

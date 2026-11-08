@@ -4,7 +4,9 @@ Standalone Grin messenger module, extracted from the
 [Flint](https://github.com/DanilaGrinRus/Flint) project: signed and encrypted
 envelope messages, direct delivery to a Tor v3 onion through **in-process Arti**,
 and an optional store-and-forward relay. No wallet, no Grin node, no RPC and no
-GUI are required.
+GUI are required. A dedicated **wallet integration layer** (Rust API + loopback
+sidecar for C++/Qt wallets) is included, see
+[docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md).
 
 Repository: <https://github.com/DanilaGrinRus/GrinMessenger> ·
 Website: <https://danilagrinrus.github.io/GrinMessenger/>
@@ -24,12 +26,13 @@ this is not the Flint wallet.
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
-Status (2026-11-08): **extraction, adaptation and an optional local web UI are
-complete; offline build is PASS, 128 automated tests are PASS (0 failed,
-2 ignored), the loopback E2E, real CLI processes, the web UI and a live Tor
-two-peer direct-onion run on a Google Cloud VM are PASS.** The original build
-sandbox has no Tor egress; live Tor was therefore verified on a GCP VM
-(Ubuntu, Arti bootstrapped 100%, direct onion delivery + signed ACK), see
+Status (2026-11-08): **extraction, adaptation, a local web UI and wallet
+integration are complete; offline build is PASS, 142 automated tests are PASS
+(0 failed, 2 ignored), the loopback E2E, real CLI processes, the web UI, a
+two-daemon wallet API run and a live Tor two-peer direct-onion run on a Google
+Cloud VM are PASS.** The original build sandbox has no Tor egress; live Tor was
+therefore verified on a GCP VM (Ubuntu, Arti bootstrapped 100%, direct onion
+delivery + signed ACK), see
 [evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
 and [REPORT.md](evidence/20261107-extraction/REPORT.md) (the detailed extraction
 report and verifier logs are kept in Russian as historical evidence).
@@ -44,6 +47,7 @@ This is a DEV/testnet tool: not audited, not ready for mainnet.
 | `flint-gateway` | `flint-relay` | loopback gateway / standalone store-and-forward relay without a wallet |
 | `flint-messenger-cli` | `flintmsg` | two-peer CLI: keygen / address / serve / send / fetch |
 | `flint-messenger-ui` | `flintmsg-ui` | local web UI: chat, contacts, envelope inspector, transcript export, relay/direct modes |
+| `flint-messenger-wallet` | `flintmsg-walletd` | wallet integration layer: embedded service, seed derivation, encrypted history/contacts/read markers and a loopback JSON API sidecar for Grin wallets |
 
 ## Build
 
@@ -133,6 +137,38 @@ The UI creates `identity.json` in the data directory when missing and keeps
 (`--identity`, `--network`, `--listen`, `--relay`, `--plain`, `--tor-state`,
 `--poll-secs`).
 
+## Wallet integration
+
+`flint-messenger-wallet` prepares the module for Grin wallets (full contract:
+[docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md)):
+
+- **Identity** — a Grin slatepack address is `bech32(ed25519 pubkey)`, and the
+  messenger uses the same format. Wallets should derive a dedicated 32-byte
+  messaging seed from the wallet master seed with
+  `derive_messaging_seed` (HKDF-SHA256, domain-separated) and keep spending keys
+  out of the messenger process. If the wallet exports its address-key seed, the
+  messenger address matches the wallet address.
+- **Slatepack transport** — wallets post already-encrypted Slatepack armor as an
+  opaque payload (`kind: "slatepack"`); the messenger never parses or finalizes
+  transactions and has no wallet RPC endpoint.
+- **Two integration styles** — embed the typed Rust service (`WalletService`) or
+  run the `flintmsg-walletd` sidecar and use its authenticated loopback JSON API
+  from C++/Qt (Grin++) or any other language.
+
+```powershell
+# sidecar for a wallet: loopback only, bearer token, history/contacts encrypted
+target\debug\flintmsg-walletd.exe --data wallet-data\messenger `
+  --seed-file wallet-data\messenger-seed.hex --network tgrin `
+  --relay http://127.0.0.1:8080 --plain --listen 127.0.0.1:0
+# prints {"event":"ready","api":"http://127.0.0.1:…","token_file":"…", …}
+```
+
+API: `GET /v1/status`, `/v1/identity`, `/v1/capabilities`, `/v1/contacts`,
+`/v1/messages`, `/v1/events` (long-poll), `/v1/unread`; `POST /v1/send`
+(`text` or `slatepack` armor), `/v1/read`; `DELETE /v1/contacts/<address>`.
+Every endpoint except `/v1/health` requires `Authorization: Bearer <token>`;
+the daemon refuses non-loopback binds.
+
 ## Using it as a library
 
 ```rust
@@ -161,16 +197,20 @@ For an external Tor with SOCKS5, `GatewayTransport::with_socks` and
 
 ```powershell
 cargo test --workspace                                      # unit + integration, no live Tor
+cargo test -p flint-messenger-wallet                         # wallet API + two-daemon E2E
 cargo test -p flint-gateway --test relay_live -- --ignored    # spawns flint-relay
 ```
 
 Run results (commands, PASS/FAIL) are in
 [evidence/20261107-extraction/](evidence/20261107-extraction/). Summary:
 `cargo build --workspace --offline --locked` — PASS;
-`cargo test --workspace --offline --locked` — 128 passed / 0 failed / 2 ignored
+`cargo test --workspace --offline --locked` — 142 passed / 0 failed / 2 ignored
 (`relay_live`, live Nostr); `cargo fmt --check` — PASS. The web-UI integration
-tests spawn a real UI process and a real relay; the screenshot in
-[docs/assets/ui.png](docs/assets/ui.png) is from a running instance.
+tests spawn a real UI process and a real relay; the wallet integration tests
+spawn two real `flintmsg-walletd` processes and a real relay and exchange text +
+encrypted Slatepack armor. Logs:
+[26-wallet-tests.log](evidence/20261107-extraction/26-wallet-tests.log),
+[27-wallet-demo.log](evidence/20261107-extraction/27-wallet-demo.log).
 
 Live Tor was verified on a GCP VM with two real processes: `flintmsg serve`
 published an onion through Arti and `flintmsg send` delivered a direct onion
@@ -181,14 +221,15 @@ that setup shares one Tokio runtime and is not representative of two peers.
 
 ## Not included
 
-- Wallet, Grin node, owner/foreign API, Slatepack transactions and their
-  automatic processing (S1/S2).
+- Wallet, Grin node, owner/foreign API, Slatepack creation/finalization and their
+  automatic processing (S1/S2). The integration layer transports wallet-provided
+  armor; transaction logic stays in the wallet.
 - The Flint desktop Slint wallet UI and the iOS client (the new local web UI is
-  included above).
+  included above; iOS needs a separate FFI/staticlib build).
 - Groups, attachments, ratchet/forward secrecy, guaranteed offline delivery,
   public abuse control and a custom P2P protocol.
 - The Nostr transport exists in the library as a separate delivery option, but
-  the v1 CLI/UI do not enable it.
+  the v1 CLI/UI/wallet daemon do not enable it.
 
 ## Limitations and honest claims
 
@@ -198,5 +239,9 @@ that setup shares one Tokio runtime and is not representative of two peers.
 - Tor hides the network path but is not a replacement for end-to-end
   encryption — the envelope provides that.
 - The project does not claim anonymity, absence of bugs or mainnet readiness.
-- The CLI keeps no persistent history/contacts: it is a demonstration tool; the
-  library `History`, `ContactBook` and `FileMailbox` are available for embedding.
+- The CLI keeps no persistent history/contacts: it is a demonstration tool. The
+  wallet daemon keeps encrypted history/contacts/read markers; message history is
+  not forward-secret and one identity per daemon is supported.
+- Wallet integration does not call wallet RPC: the wallet decides when to create
+  or finalize a Slatepack, which keeps the layer usable by grin-wallet, Grin++ and
+  other wallets.

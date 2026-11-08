@@ -14,6 +14,7 @@ RPC и платёжной интеграции **не переносился**.
 | `flint-gateway` (`flint-relay`) | standalone store-and-forward relay без кошелька | `crates/core/src/gateway.rs`, `crates/core/src/bin/flint-relay.rs` |
 | `flint-messenger-cli` (`flintmsg`) | keygen/address/serve/send/fetch | новый код; использует извлечённые крейты |
 | `flint-messenger-ui` (`flintmsg-ui`) | локальный веб-UI: чат, контакты, envelope inspector, экспорт транскрипта | новый код (2026-11-08), не извлекался из Flint |
+| `flint-messenger-wallet` (`flintmsg-walletd`) | интеграция с кошельками: `WalletService`, деривация seed, шифрованные history/contacts/read-маркеры, loopback JSON API для кошельков | новый код (2026-11-08), не извлекался из Flint |
 
 Лицензия: **MIT OR Apache-2.0** (владелец прав разрешил перелицензировать
 выделенный код; Apache-2.0-части grin-wallet сохраняют уведомления). См.
@@ -29,10 +30,10 @@ RPC и платёжной интеграции **не переносился**.
 | GCP (live Tor) | Ubuntu 24.04 VM `grin-linux-build` (e2-medium, us-central1-a), Rust 1.99.1, публичный интернет; репозиторий клонирован с GitHub |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
-| Исходники | 37 `.rs`, 11 734 строк; `Cargo.lock` 556 пакетов; + один встроенный `ui.html` |
-| Бинари (build output) | `target/debug/flintmsg.exe` 26.97 МБ, `target/debug/flint-relay.exe` 3.26 МБ, `target/debug/flintmsg-ui.exe` 27.06 МБ; **в поставку не входят, пересобираются из исходников** |
+| Исходники | 43 `.rs`, 14 421 строк; `Cargo.lock` 556 пакетов; + один встроенный `ui.html` |
+| Бинари (build output) | `target/debug/flintmsg.exe` 26.98 МБ, `target/debug/flint-relay.exe` 3.26 МБ, `target/debug/flintmsg-ui.exe` 27.07 МБ, `target/debug/flintmsg-walletd.exe` 27.38 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
-| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 59 файлов |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 68 файлов |
 
 ## Проверки
 
@@ -64,14 +65,16 @@ RPC и платёжной интеграции **не переносился**.
 | 16 | GCP VM: клон опубликованного репозитория, сборка на Linux (Ubuntu, Rust 1.99) | **PASS**: cold build ~20m 58s; чистая пересборка после фиксов 17m 22s; инкрементальная `cargo build` 13.26 s; `BUILD_EXIT=0` | [23-gcp-build.log](23-gcp-build.log) |
 | 17 | GCP VM: **live Tor/Arti, два реальных процесса** (`flintmsg serve` публикует onion через Arti; `flintmsg send` доставляет direct onion; получатель открывает и шлёт signed ACK) + полный `cargo test --workspace` на Linux | **PASS** (2026-11-08): Linux tests **128 passed / 0 failed / 2 ignored**, `WORKSPACE_TEST_EXIT=0`; Arti bootstrap 100%, `BOB_READY=1`, `SENT=1`, `RECEIVED=1`, signed ACK `count=1` | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
 | 18 | Найден и исправлен wire-баг live-режима: hyper отправлял absolute-form request-target, gateway отвечал 404; фикс + регрессионный тест | **PASS**: commit `d828211` (origin-form + Host; gateway принимает absolute-form), тест `absolute_form_request_target_is_routed_correctly`; после фикса direct onion доставка работает | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
+| 19 | Интеграция с кошельками: unit-тесты (деривация seed, storage key, encrypted read markers, bind policy, capabilities) | **PASS**: 11 unit-тестов `flint-messenger-wallet` | [26-wallet-tests.log](26-wallet-tests.log) |
+| 20 | Интеграция с кошельками: два реальных `flintmsg-walletd` + реальный `flint-relay` (text, encrypted Slatepack, contacts, unread/read, events, auth, validation) + API-demo | **PASS**: 3 integration-теста; demo: capabilities/identity, contacts, доставка text и slatepack, `unread`/`read`, `events` | [26-wallet-tests.log](26-wallet-tests.log), [27-wallet-demo.log](27-wallet-demo.log) |
 
-Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI и live Tor
-(cross-process direct onion на GCP VM) — PASS; известных P0–P2 дефектов нет;
-локальная песочница сама по себе не имеет Tor-выхода, поэтому live-прогон
-выполнен на GCP и привязан к коммиту.**
+Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI, интеграция
+с кошельками (embedded + sidecar API) и live Tor (cross-process direct onion на
+GCP VM) — PASS; известных P0–P2 дефектов нет; локальная песочница сама по себе
+не имеет Tor-выхода, поэтому live-прогон выполнен на GCP и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `268369efa9c73e6c06015243546a3da7b88fe0595ded7924b2504deee508673d`
+SHA-256 — `a2fc6920ab6759ec625e5bf9476800d96ef3803ac0b60400095028221a37dc52`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
@@ -80,7 +83,7 @@ SHA-256 — `268369efa9c73e6c06015243546a3da7b88fe0595ded7924b2504deee508673d`
 > изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
 > добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
 > 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
-> актуальный freeze-манифест — `268369ef…8673d`. VERIFY.md оставлен как
+> актуальный freeze-манифест — `a2fc6920…dc52`. VERIFY.md оставлен как
 > исторический артефакт.
 
 ### Что именно подтверждено
@@ -97,7 +100,11 @@ SHA-256 — `268369efa9c73e6c06015243546a3da7b88fe0595ded7924b2504deee508673d`
   `2a6at2obto3uvkpkitqp4wxcg6u36qf534eucbskqciturczzc5suyid`;
 - **live Tor/Arti**: на GCP VM два независимых процесса `flintmsg serve`/`send`
   провели direct onion доставку с signed ACK; попутно найден и исправлен
-  wire-баг absolute-form (commit `d828211`) с регрессионным тестом.
+  wire-баг absolute-form (commit `d828211`) с регрессионным тестом;
+- **интеграция с кошельками**: `WalletService`/`flintmsg-walletd` — деривация
+  seed, encrypted history/contacts/read markers, cursor/events API; проверено
+  двумя реальными daemon-процессами и реальным relay (text + encrypted
+  Slatepack, contacts, unread/read, auth/validation).
 
 ### Что НЕ подтверждено (честно)
 
@@ -107,6 +114,9 @@ SHA-256 — `268369efa9c73e6c06015243546a3da7b88fe0595ded7924b2504deee508673d`
   подтверждены ([25-live-tor-gcp.log](25-live-tor-gcp.log)).
 - **Direct-режим веб-UI**: требует Tor/Arti, в этом окружении не проверялся;
   проверен relay/loopback-режим (реальный браузер + реальный relay).
+- **Интеграция с кошельками**: API проверен на двух реальных daemon-процессах и
+  реальном relay; автоматическая обработка Slatepack/RPC кошелька и iOS/FFI-сборка
+  в эту поставку не входят (слой только транспортирует armor).
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
 - **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
   DEV/testnet-инструмент.

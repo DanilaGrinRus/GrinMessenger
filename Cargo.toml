@@ -6,6 +6,7 @@ members = [
     "crates/flint-gateway",
     "crates/flint-messenger-cli",
     "crates/flint-messenger-ui",
+    "crates/flint-messenger-wallet",
 ]
 
 [workspace.package]

@@ -1,0 +1,256 @@
+warning: constant `CONNECT_TIMEOUT` is never used
+  --> crates\flint-messenger\src\nostr\ws.rs:31:7
+   |
+31 | const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+   |       ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `flint-messenger` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 0.67s
+     Running unittests src\lib.rs (target\debug\deps\flint_gateway-7d3615fedffce507.exe)
+
+running 20 tests
+test gateway::tests::per_ip_post_rate_is_bounded_and_independent ... ok
+test gateway::tests::per_recipient_post_rate_is_bounded ... ok
+test gateway::tests::degraded_storage_returns_500_and_keeps_the_message_invisible ... ok
+test gateway::tests::quotas_are_enforced_per_recipient ... ok
+test gateway::tests::junk_addresses_and_oversized_payloads_are_rejected ... ok
+test gateway::tests::absolute_form_request_target_is_routed_correctly ... ok
+test gateway::tests::ack_rejects_non_uuid_and_traversal_ids ... ok
+test gateway::tests::ack_requires_the_same_recipient ... ok
+test gateway::tests::restart_keeps_the_persisted_post_quota ... ok
+test gateway::tests::relay_sees_only_recipient_and_opaque_payload ... ok
+test gateway::tests::require_pow_rejects_an_envelope_without_a_proof ... ok
+test gateway::tests::direct_transport_derives_recipient_onion_and_uses_local_mailbox ... ok
+test gateway::tests::relay_mode_has_no_wallet_and_requires_signed_acks ... ok
+test gateway::tests::sdk_transport_exchanges_messages_through_gateway ... ok
+test gateway::tests::gateway_waits_for_a_request_split_across_packets ... ok
+test gateway::tests::relay_store_survives_a_process_restart ... ok
+test gateway::tests::sdk_transport_works_through_a_socks_proxy ... ok
+test gateway::tests::connection_flood_is_shed_with_503 ... ok
+test gateway::tests::a_full_queue_response_stays_below_the_client_limit ... ok
+test gateway::tests::expired_messages_are_not_delivered ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+
+     Running unittests src\bin\flint-relay.rs (target\debug\deps\flint_relay-3fb22842e5826b47.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\relay_live.rs (target\debug\deps\relay_live-ad7b4b84b788ba42.exe)
+
+running 1 test
+test local_relay_quarantines_broken_envelopes_and_restart_skips_them ... ignored, spawns the real flint-relay binary
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\flint_messenger-3d20f1cfe4945e1a.exe)
+
+running 90 tests
+test address::tests::junk_and_foreign_prefixes_are_rejected ... ok
+test address::tests::key_length_is_enforced ... ok
+test address::tests::address_roundtrips ... ok
+test address::tests::onion_matches_the_upstream_v3_vector ... ok
+test envelope::tests::default_ttl_is_26_hours ... ok
+test envelope::tests::known_address_vector ... ok
+test contacts::tests::invalid_names_and_addresses_are_rejected ... ok
+test crypto::tests::other_key_cannot_open ... ok
+test crypto::tests::box_roundtrips_and_is_bound_to_aad ... ok
+test contacts::tests::fresh_lock_is_not_treated_as_stale ... ok
+test contacts::tests::old_holder_does_not_delete_a_replaced_lock ... ok
+test ack::tests::signs_and_verifies_the_recipient ... ok
+test contacts::tests::file_contains_no_addresses_or_names ... ok
+test contacts::tests::stale_lock_is_recovered ... ok
+test envelope::tests::forged_sender_signature_is_rejected ... ok
+test contacts::tests::wrong_key_and_tamper_fail ... ok
+test history::tests::delete_and_uuid_validation ... ok
+test history::tests::contains_is_the_persistent_dedup_marker ... ok
+test contacts::tests::parallel_books_do_not_lose_contacts ... ok
+test ack::tests::wrong_recipient_id_timestamp_or_signature_is_rejected ... ok
+test history::tests::expired_records_are_removed_but_legacy_records_stay ... ok
+test contacts::tests::saves_updates_lists_and_deletes ... ok
+test envelope::tests::expired_and_bad_ttl_are_rejected ... ok
+test keywrap::tests::absurd_kdf_parameters_are_rejected_before_allocation ... ok
+test history::tests::wrong_key_and_tamper_fail ... ok
+test history::tests::roundtrip_ordered_and_encrypted_at_rest ... ok
+test envelope::tests::tampering_is_rejected ... ok
+test history::tests::quota_prunes_oldest ... ok
+test envelope::tests::encrypted_slatepack_is_accepted_plaintext_is_not ... ok
+test filestore::tests::persists_across_reopen_and_never_writes_plaintext ... ok
+test envelope::tests::roundtrip_hides_sender_and_body_from_the_relay ... ok
+test nostr::event::tests::sign_and_verify_roundtrip ... ok
+test nostr::event::tests::tampering_is_rejected ... ok
+test nostr::keys::tests::invalid_hex_is_rejected ... ok
+test history::tests::list_returns_the_newest_page ... ok
+test nostr::keys::tests::generate_public_and_roundtrip ... ok
+test nostr::nip44::tests::official_vector_a ... ok
+test filestore::tests::ack_and_duplicate_delivery ... ok
+test envelope::tests::proof_of_work_is_mined_and_checked ... ok
+test nostr::nip44::tests::padding_buckets ... ok
+test nostr::relay::tests::publish_query_and_delete ... ok
+test nostr::transport::tests::contact_directory_maps_saved_keys ... ok
+test nostr::transport::tests::foreign_wrap_is_skipped ... ok
+test nostr::nip44::tests::roundtrip_and_rejections ... ok
+test nostr::nip44::tests::extended_prefix_roundtrip ... ok
+test nostr::transport::tests::unknown_recipient_is_explicit ... ok
+test nostr::wrap::tests::wrap_unwrap_roundtrip ... ok
+test envelope::tests::wrong_recipient_cannot_open ... ok
+test nostr::wrap::tests::wrong_recipient_and_tampering_are_rejected ... ok
+test nostr::ws::tests::live_relay_req_returns_eose ... ignored, network: requires FLINT_NOSTR_LIVE_RELAY
+test nostr::ws::tests::auth_event_carries_relay_and_challenge ... ok
+test nostr::ws::tests::payloads_and_messages ... ok
+test nostr::ws::tests::query_answers_auth_challenge_and_retries ... ok
+test nostr::ws::tests::query_rejects_an_oversized_message ... ok
+test nostr::ws::tests::url_policy ... ok
+test nostr::transport::tests::deliver_fetch_ack ... ok
+test nostr::ws::tests::query_stops_a_message_flood ... ok
+test store::tests::default_ttl_is_26h ... ok
+test nostr::transport::tests::slatepack_armor_survives_over_nostr ... ok
+test store::tests::duplicate_ids_are_idempotent ... ok
+test store::tests::a_restarted_messenger_skips_durable_quarantine_ids ... ok
+test store::tests::failed_envelope_can_be_acked_after_the_decision ... ok
+test store::tests::fixed_time_is_only_used_in_tests ... ok
+test filestore::tests::expired_messages_are_not_returned ... ok
+test store::tests::bad_envelope_does_not_block_the_rest_of_the_batch ... ok
+test store::tests::oversized_messages_are_rejected ... ok
+test store::tests::messenger_roundtrip_acks_delivered_messages ... ok
+test store::tests::queue_quota_is_enforced ... ok
+test filestore::tests::quota_ttl_and_uuid_are_enforced ... ok
+test nostr::transport::tests::transport_roundtrip_over_loopback_relay ... ok
+test store::tests::future_clock_cannot_extend_storage ... ok
+test store::tests::replay_after_ack_is_not_returned_twice ... ok
+test nostr::ws::tests::handshake_is_bounded_by_the_connect_budget ... ok
+test store::tests::ttl_bounds_are_checked_by_the_store ... ok
+test transport::tests::gateway_transport_signed_ack_goes_through_the_connector ... ok
+test transport::tests::url_and_proxy_validation_keeps_the_old_contract ... ok
+test transport::tests::gateway_transport_delegates_absolute_urls_to_the_connector ... ok
+test transport::tests::gateway_transport_fetch_parses_the_connector_response ... ok
+test transport::tests::direct_onion_delivery_uses_the_configured_connector ... ok
+test store::tests::expired_messages_are_not_stored_or_fetched ... ok
+test store::tests::many_broken_envelopes_do_not_hide_the_good_one ... ok
+test store::tests::store_fetch_ack_roundtrip ... ok
+test history::tests::large_history_is_bounded_and_lists_newest_first ... ok
+test keywrap::tests::short_nonce_is_an_error_not_a_panic ... ok
+test keywrap::tests::empty_password_is_refused ... ok
+test keywrap::tests::version_is_checked ... ok
+test keywrap::tests::each_wrap_has_fresh_salt_and_nonce ... ok
+test keywrap::tests::wrong_password_and_tamper_fail ... ok
+test keywrap::tests::v1_fixture_opens_and_upgrades ... ok
+test keywrap::tests::v2_roundtrip_and_rewrap ... ok
+
+test result: ok. 89 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.24s
+
+     Running unittests src\main.rs (target\debug\deps\flintmsg-afab1d548003364f.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\cli_smoke.rs (target\debug\deps\cli_smoke-930a6ddb807a51a6.exe)
+
+running 3 tests
+test keygen_refuses_to_overwrite_without_force ... ok
+test plain_mode_refuses_onion_target ... ok
+test cli_keygen_send_and_fetch_through_plain_relay ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests\loopback_e2e.rs (target\debug\deps\loopback_e2e-57523b8103b8d970.exe)
+
+running 9 tests
+test plaintext_slatepack_is_refused ... ok
+test onion_address_matches_tor_arti_derivation ... ok
+test relay_rejects_envelope_without_required_pow ... ok
+test duplicate_delivery_is_stored_once ... ok
+test tampered_envelope_is_quarantined_not_opened ... ok
+test unsigned_ack_is_rejected_and_signed_ack_works ... ok
+test direct_loopback_roundtrip_with_signed_ack ... ok
+test relay_restart_keeps_stored_messages ... ok
+test offline_delivery_is_an_error_not_a_silent_success ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+     Running unittests src\main.rs (target\debug\deps\flintmsg_ui-cc7225c97850d88e.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\ui_api.rs (target\debug\deps\ui_api-aa858d6a049e3c7a.exe)
+
+running 2 tests
+test invalid_requests_are_rejected ... ok
+test ui_chat_roundtrip_and_contacts ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s
+
+     Running unittests src\lib.rs (target\debug\deps\flint_messenger_wallet-3be180be7f42d1fb.exe)
+
+running 11 tests
+test identity::tests::derivation_is_deterministic_and_domain_separated ... ok
+test identity::tests::storage_key_depends_on_network_and_seed ... ok
+test identity::tests::seed_parsing_accepts_hex_and_base64 ... ok
+test service::tests::capabilities_are_stable ... ok
+test server::tests::constant_time_compare_works ... ok
+test server::tests::non_loopback_bind_is_refused ... ok
+test service::tests::service_opens_with_empty_encrypted_storage ... ok
+test service::tests::wrong_network_addresses_are_rejected ... ok
+test identity::tests::generated_identity_is_stable_across_reload ... ok
+test read_state::tests::wrong_key_fails_closed ... ok
+test read_state::tests::markers_roundtrip_and_do_not_go_backwards ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\main.rs (target\debug\deps\flintmsg_walletd-652d3b0a09524d2f.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\wallet_api.rs (target\debug\deps\wallet_api-4e6ed5f31f7b757f.exe)
+
+running 3 tests
+test identity_subcommand_derives_address_without_printing_seed ... ok
+test api_rejects_bad_auth_and_invalid_requests ... ok
+test wallet_daemons_exchange_text_and_slatepack ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.19s
+
+     Running unittests src\lib.rs (target\debug\deps\flint_tor_arti-1abb9addc27b594d.exe)
+
+running 5 tests
+test onion::tests::address_roundtrips_to_the_same_onion ... ok
+test onion::tests::key_vector_matches_the_reference_onion ... ok
+test onion::tests::junk_is_rejected ... ok
+test onion::tests::onion_parses_back_to_the_key ... ok
+test onion::tests::seed_derives_a_stable_onion ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests flint_gateway
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests flint_messenger
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests flint_messenger_wallet
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests flint_tor_arti
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

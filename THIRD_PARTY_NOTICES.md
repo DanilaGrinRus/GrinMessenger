@@ -76,6 +76,16 @@ The UI itself is served by `crates/flint-messenger-ui`: a Rust std HTTP server
 with one embedded HTML page, no WebView/browser engine or Node.js runtime added
 to the project.
 
+## Wallet integration layer
+
+`crates/flint-messenger-wallet` is new project code (no copied wallet code). It
+links only the existing workspace crates (`flint-messenger`, `flint-gateway`,
+`flint-tor-arti`) plus crates that are already in `Cargo.lock` (serde, hkdf,
+sha2, chacha20poly1305, zeroize, data-encoding, getrandom). No wallet RPC client,
+Grin node code, Slatepack implementation or third-party file from Flint's wallet
+is included; Slatepack armor is treated as an opaque payload supplied by the
+wallet.
+
 ## Tor Project
 
 "Tor" and the onion service address format are described by the Tor Project:

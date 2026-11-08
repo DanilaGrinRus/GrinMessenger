@@ -1,0 +1,44 @@
+=== GrinMessenger wallet integration demo (sidecar API, two daemons + relay) ===
+started: 2026-11-08T08:18:49.3769792+07:00
+--- relay ---
+flint-relay listening on http://127.0.0.1:18081
+
+--- daemons started (sidecar JSON line, token not printed) ---
+{"address":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","api":"http://127.0.0.1:61898","api_version":1,"event":"ready","mode":"relay","network":"tgrin","phase":"starting","pid":22404,"token_env":"FLINTMSG_WALLETD_TOKEN","token_file":"C:\\DHW\\GrinMessageModule\\.tmp-wallet-demo\\data-alice\\api-token"}
+{"address":"tgrin1w2f9le80crl7pj7lyfrym72cxhjg5whsz9xszquqn5um34mch0wsgmxumw","api":"http://127.0.0.1:61900","api_version":1,"event":"ready","mode":"relay","network":"tgrin","phase":"starting","pid":45972,"token_env":"FLINTMSG_WALLETD_TOKEN","token_file":"C:\\DHW\\GrinMessageModule\\.tmp-wallet-demo\\data-bob\\api-token"}
+
+--- GET /v1/capabilities (alice) ---
+{"api_version":1,"auth":"bearer","bind":"loopback","kinds":["text","slatepack"],"max_armor_bytes":32768,"max_text_bytes":8192,"protocol_version":1,"slatepack_plaintext":false,"transports":["relay","direct"]}
+
+--- GET /v1/identity (alice) ---
+{"address":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","api_version":1,"mode":"relay","network":"tgrin","onion":"fxxbkq2a47am2gupc7orbmwgpbc65cebs6hekfkoksfjub7d27phjiqd","onion_url":"http://fxxbkq2a47am2gupc7orbmwgpbc65cebs6hekfkoksfjub7d27phjiqd.onion"}
+
+--- POST /v1/contacts (alice adds bob) ---
+{"contact":{"address":"tgrin1w2f9le80crl7pj7lyfrym72cxhjg5whsz9xszquqn5um34mch0wsgmxumw","created_at":1794100730,"name":"Bob","nostr":null,"updated_at":1794100730}}
+
+--- POST /v1/send text alice -> bob ---
+{"message":{"created_at":1794100730,"direction":"outgoing","expires_at":1794143930,"id":"a99d1300-f402-4448-92e0-16c8dd97a66f","kind":"text","peer":"tgrin1w2f9le80crl7pj7lyfrym72cxhjg5whsz9xszquqn5um34mch0wsgmxumw","seq":2,"text":"hello bob from a wallet"}}
+
+--- GET /v1/messages (bob, incoming) ---
+{"created_at":1794100730,"direction":"incoming","id":"a99d1300-f402-4448-92e0-16c8dd97a66f","kind":"text","peer":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","seq":2,"text":"hello bob from a wallet"}
+
+--- GET /v1/unread (bob) ---
+{"peers":{"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm":1},"total":1}
+
+--- GET /v1/events?since=0&wait=2 (bob) ---
+{"epoch":"3f649b5a786159a707eee8ecc71a9db4","events":[{"detail":"relay http://127.0.0.1:18081 (plain TCP)","phase":"ready","seq":1,"type":"status"},{"message":{"created_at":1794100730,"direction":"incoming","id":"a99d1300-f402-4448-92e0-16c8dd97a66f","kind":"text","peer":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","seq":2,"text":"hello bob from a wallet"},"seq":2,"type":"message"}],"next":2}
+
+--- POST /v1/send slatepack armor bob -> alice ---
+{"message":{"armor":"BEGINSLATEPACK.5XQXXX.ENDSLATEPACK","created_at":1794100731,"direction":"outgoing","encrypted":true,"expires_at":1794143931,"id":"d571e9b7-cc44-4a6e-b2d4-171b19e8fc58","kind":"slatepack","peer":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","seq":3}}
+
+--- GET /v1/messages (alice, incoming slatepack) ---
+{"armor":"BEGINSLATEPACK.5XQXXX.ENDSLATEPACK","created_at":1794100731,"direction":"incoming","encrypted":true,"id":"d571e9b7-cc44-4a6e-b2d4-171b19e8fc58","kind":"slatepack","peer":"tgrin1w2f9le80crl7pj7lyfrym72cxhjg5whsz9xszquqn5um34mch0wsgmxumw","seq":3}
+
+--- POST /v1/read (bob marks alice read) ---
+{"peer":"tgrin19hhp2s6qulqv6x50zlw3pvkx0pz7azypj78y292w2j9f5plr6l0qcnr7wm","read_at":1794100730}
+
+--- GET /v1/unread after read (bob) ---
+{"peers":{},"total":0}
+
+=== demo complete: text + encrypted slatepack delivered, unread/read/events work ===
+finished: 2026-11-08T08:18:52.3343007+07:00

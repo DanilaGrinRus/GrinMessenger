@@ -4,14 +4,18 @@
 
 ```text
 flintmsg (CLI)  ─────┐
-flintmsg-ui (web) ───┴──► flint-messenger   envelope, crypto, PoW, ACK, store, transport
+flintmsg-ui (web) ───┤
+flintmsg-walletd ────┴──► flint-messenger   envelope, crypto, PoW, ACK, store, transport
                         ├── flint-tor-arti  Arti client + onion service + onion addresses
                         └── flint-gateway   loopback gateway / standalone relay (flint-relay)
+                        ▲
+flint-messenger-wallet ──┘  wallet-facing service: seed derivation, encrypted
+                           history/contacts/read markers, poll/event index
 ```
 
-The CLI and the web UI implement the same `HttpConnector` over
-`flint-tor-arti::TorHttpClient`; the wire format and delivery semantics do not
-depend on the shell.
+The CLI, the web UI and the wallet daemon implement the same `HttpConnector`
+over `flint-tor-arti::TorHttpClient`; the wire format and delivery semantics do
+not depend on the shell.
 
 Dependencies are one-directional:
 
@@ -25,6 +29,11 @@ Dependencies are one-directional:
 - `flint-messenger-ui` — optional local web UI: a small blocking HTTP server
   (std `TcpListener`) with a JSON API and one embedded HTML page; it uses the
   same library API and adds no new dependencies.
+- `flint-messenger-wallet` — wallet integration layer: `WalletService`
+  (identity from a wallet-derived seed, encrypted history/contacts/read markers,
+  poll/event index) and `flintmsg-walletd`, a loopback HTTP sidecar with bearer
+  token. It reuses `flint-messenger`, `flint-gateway` and `flint-tor-arti`; no
+  wallet RPC or transaction logic is linked in.
 
 ## Direct mode (primary)
 
@@ -93,6 +102,33 @@ bootstrap / onion service) runs in a background thread so the page is available
 immediately and shows `tor`/`ready`/`error` state. There is no authentication:
 the server binds loopback and must not be exposed.
 
+## Wallet integration (`flint-messenger-wallet` / `flintmsg-walletd`)
+
+Two entry points share one service implementation:
+
+- **Embedded**: a Rust wallet calls `WalletService::open` with a 32-byte
+  messaging seed and `start_network`, then uses typed methods (`send_text`,
+  `events`, `contacts`, …).
+- **Sidecar**: `flintmsg-walletd` owns one identity and exposes an authenticated
+  loopback JSON API (`/v1/status`, `/v1/events`, `/v1/send`, …). The wallet owns
+  the seed (file/env/identity file), reads the printed API URL + token file and
+  supervises the process.
+
+Key points:
+
+- The wallet supplies the seed. `derive_messaging_seed` performs HKDF-SHA256
+  domain separation; the messenger address is the same `bech32(ed25519)`
+  format as a Grin slatepack address, and storage keys are derived separately.
+- History, contacts and read markers are encrypted at rest with the storage key.
+- The service polls the relay/onion, records opened envelopes **before** sending
+  the signed ACK, and keeps a monotonic local `seq` cursor plus a per-start
+  `epoch` for wallet notification loops.
+- Slatepack armor is an opaque payload (`MessageKind::Slatepack`, encrypted=true
+  enforced); the layer never parses or creates transactions and has no wallet
+  RPC endpoint.
+- The sidecar binds loopback only, requires a bearer token for every endpoint
+  except `/v1/health`, and has no CORS/TLS (local process API).
+
 ## Trust boundaries
 
 - **Envelope**: confidentiality and integrity are provided by
@@ -106,6 +142,11 @@ the server binds loopback and must not be exposed.
 - **CLI/UI**: the identity file is a secret; CLI stdout and the UI page may
   contain plaintext messages — that is user-facing output, not service logging.
   The UI is loopback-only and has no authentication.
+- **Wallet daemon**: the seed never leaves the process; the loopback API is
+  protected by a bearer token (`0600` file on Unix); history/contacts/read markers
+  are encrypted with a separate storage key. The daemon has no wallet RPC and
+  cannot spend funds. A local process that reads the token file can send
+  messages as the wallet identity — treat the token like a session secret.
 
 ## Flows and resources
 
@@ -121,21 +162,29 @@ the server binds loopback and must not be exposed.
 - The web UI is a thin shell: one OS thread per HTTP connection, one background
   poll thread, no async runtime of its own; it reuses the Arti runtime kept by
   `flint-tor-arti`.
+- The wallet daemon is the same shape: per-connection threads, one network poll
+  thread, a `Mutex`-protected event/message index with long-poll windows; the
+  HTTP sidecar and embedded `WalletService` use identical code paths.
 - HTTP on the wire: `TorHttpClient` sends an origin-form request target with an
   explicit `Host` header, and the gateway also normalizes absolute-form targets
   (regression-tested). This matters: hyper emits absolute-form when the request
   URI carries a scheme+authority, and a minimal origin server would otherwise
   answer 404 for every `/flint/v1/*` call.
+- Wallet API limits: text 8 KiB, Slatepack armor 32 KiB, TTL 1 s–7 days,
+  contact limit 500, event long-poll ≤30 s.
 
 ## Out of scope
 
-- Wallet, Grin node, RPC/owner API, Slatepack transactions and their automatic
-  processing.
+- Wallet, Grin node, RPC/owner API, Slatepack creation/finalization and their
+  automatic processing. The wallet integration layer only transports the armor
+  the wallet provides; transaction logic stays in the wallet.
 - The Slint desktop wallet UI and the Flint desktop lifecycle (the separate
   local web UI above is included).
 - Groups, attachments, ratchet/forward secrecy, offline guarantees, public abuse
   control.
 - A custom P2P protocol/network.
+- Native mobile/FFI builds (the wallet layer is a Rust crate + local sidecar; iOS
+  needs a separate staticlib/FFI integration).
 
 ## Build and evidence
 
