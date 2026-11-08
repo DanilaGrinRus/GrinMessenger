@@ -12,3 +12,5 @@ flintmsg-wallet/
 api-token
 *.seed
 seed.hex
+/.tmp-*
+/tmp-*
