@@ -24,8 +24,8 @@ produces two platform bundles:
 |---|---|
 | Linux x86_64 | `flintmsg`, `flint-relay`, `flintmsg-ui`, `flintmsg-walletd`, `flintmsg-wallet-ui` |
 | Windows x86_64 | the same binaries with `.exe` |
-| Both | `Cargo.lock`, per-platform `SHA256SUMS.txt` |
-| Both | `sbom.cyclonedx.json` (CycloneDX SBOM generated with Syft/Anchore) |
+| Both | `SHA256SUMS-linux-x86_64.txt` / `SHA256SUMS-windows-x86_64.txt` (one per platform) |
+| Both | `Cargo.lock.release` (exact dependency graph) and `sbom.cyclonedx.json` (CycloneDX SBOM generated with Syft/Anchore) |
 
 The job attaches them to a GitHub Release with generated release notes. The
 artifacts are **not code-signed**: verify the SHA-256 sums and build from the
@@ -45,7 +45,7 @@ git push origin vX.Y.Z
 ```
 
 Then wait for the `release` workflow; confirm the GitHub Release contains both
-platform bundles, `SHA256SUMS.txt` and the SBOM. Check the live site deploy
+platform bundles, `SHA256SUMS-*.txt` and the SBOM. Check the live site deploy
 (`pages` workflow) if `site/**` changed.
 
 ## Verifying a download
@@ -53,10 +53,10 @@ platform bundles, `SHA256SUMS.txt` and the SBOM. Check the live site deploy
 ```powershell
 # Windows
 Get-FileHash .\flintmsg-walletd.exe -Algorithm SHA256
-Get-Content .\SHA256SUMS.txt
+Get-Content .\SHA256SUMS-windows-x86_64.txt
 
 # Linux/macOS
-sha256sum -c SHA256SUMS.txt
+sha256sum -c SHA256SUMS-linux-x86_64.txt
 ```
 
 `Cargo.lock` is included so the exact dependency graph can be reproduced with

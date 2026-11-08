@@ -52,9 +52,8 @@ jobs:
           cp "target/release/flintmsg-ui${exe}" dist/
           cp "target/release/flintmsg-walletd${exe}" dist/
           cp "target/release/flintmsg-wallet-ui${exe}" dist/
-          cp Cargo.lock dist/Cargo.lock
-          (cd dist && sha256sum * > SHA256SUMS.txt)
-          cat dist/SHA256SUMS.txt
+          (cd dist && sha256sum flint* > "SHA256SUMS-${{ matrix.artifact }}.txt")
+          cat "dist/SHA256SUMS-${{ matrix.artifact }}.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.artifact }}
@@ -75,10 +74,14 @@ jobs:
           output-file: sbom.cyclonedx.json
           upload-artifact: false
           upload-release-assets: false
+      - name: include lockfile
+        run: cp Cargo.lock Cargo.lock.release
       - uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: sbom.cyclonedx.json
+          path: |
+            sbom.cyclonedx.json
+            Cargo.lock.release
           if-no-files-found: error
 
   release:
