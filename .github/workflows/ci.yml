@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -51,8 +50,22 @@ jobs:
   audit:
     name: dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: 1.99.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
+      # Two advisories come from arti's transitive ssh-key-fork -> rsa 0.9.10
+      # path (no patched rsa release exists). They are documented with rationale
+      # in docs/SECURITY.md; RSA is used for SSH key parsing, not wallet RSA.
+      - name: cargo audit
+        run: >
+          cargo audit --file Cargo.lock
+          --ignore RUSTSEC-2023-0071
+          --ignore RUSTSEC-2026-0387
