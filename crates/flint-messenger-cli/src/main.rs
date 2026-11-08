@@ -107,9 +107,34 @@ fn save_identity(path: &Path, network: &str, seed: &[u8; 32]) -> CliResult<()> {
         seed_hex: data_encoding::HEXLOWER.encode(seed),
     };
     let json = serde_json::to_string_pretty(&file).map_err(|e| format!("identity JSON: {e}"))?;
-    fs::write(path, format!("{json}\n"))
+    write_private_file(path, format!("{json}\n").as_bytes())
         .map_err(|e| format!("identity {}: {e}", path.display()))?;
     Ok(())
+}
+
+/// Write the identity seed so that it is not readable by other local users.
+///
+/// Unix: create/open with mode `0600` and tighten a pre-existing file *before*
+/// writing the seed bytes (no `fs::write` + late `chmod` window).
+/// Windows: file ACLs are inherited from the parent directory; keep `--data`
+/// and the identity path inside the user's profile (the wallet daemon performs
+/// an explicit ACL hardening step; this small CLI does not).
+fn write_private_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 fn load_identity(path: &Path) -> CliResult<(Identity, [u8; 32])> {
@@ -324,10 +349,14 @@ fn cmd_serve(args: &[String]) -> CliResult<()> {
         require_signed_ack: true,
         require_pow: true,
         ttl_secs,
-        max_per_recipient: 30,
-        max_total: 1_000,
+        max_per_recipient: 500,
+        max_total: 5_000,
         max_payload: 32 * 1024,
         max_posts_per_minute: 30,
+        // Tor forwards every sender from 127.0.0.1; a shared rate bucket lets
+        // one cheap attacker block legitimate messages. Direct mode relies on
+        // the larger queue + PoW + this client's poll/ack drain loop instead.
+        enforce_post_rate: false,
         ..GatewayConfig::default()
     })
     .map_err(|e| format!("gateway: {e}"))?;
@@ -605,5 +634,35 @@ fn emit_json(value: &serde_json::Value) {
             let _ = lock.flush();
         }
         Err(error) => eprintln!("flintmsg: JSON: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identity_seed_file_is_owner_only() {
+        let dir = std::env::temp_dir().join(format!(
+            "flintmsg-cli-identity-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("identity.json");
+        save_identity(&path, "tgrin", &[7u8; 32]).unwrap();
+        let (identity, seed) = load_identity(&path).unwrap();
+        assert_eq!(seed, [7u8; 32]);
+        assert_eq!(identity.address().hrp(), "tgrin");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "CLI identity seed must be owner-only");
+        }
+        fs::remove_dir_all(dir).ok();
     }
 }

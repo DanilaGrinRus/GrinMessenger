@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrinMessenger Wallet Console</title>
+<style>
+  :root {
+    --bg: #0b1117;
+    --panel: #111c24;
+    --panel2: #0e171e;
+    --line: #1f303b;
+    --text: #d7e6ee;
+    --muted: #7f97a6;
+    --mint: #3ddc97;
+    --mint2: #1f9d6c;
+    --warn: #f0b85a;
+    --err: #ef6b6b;
+    --blue: #6cb8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 15% -10%, #12222d 0%, var(--bg) 55%);
+    color: var(--text);
+    font: 14px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  code, pre, .mono { font-family: "Cascadia Mono", ui-monospace, Consolas, monospace; }
+  a { color: var(--mint); }
+  button, input, select, textarea {
+    font: inherit;
+    color: var(--text);
+    background: #0c161d;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  button { cursor: pointer; transition: border-color .15s, background .15s; }
+  button:hover { border-color: var(--mint2); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--mint); color: #04110b; border-color: var(--mint); font-weight: 650; }
+  button.ghost { background: transparent; }
+  button.small { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid rgba(61, 220, 151, .55); outline-offset: 1px;
+  }
+  .top {
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 17, 22, .82);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
+  .brand .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--mint); box-shadow: 0 0 16px rgba(61, 220, 151, .8);
+  }
+  .brand small { color: var(--muted); font-weight: 500; }
+  .statusline { display: flex; align-items: center; gap: 8px; color: var(--muted); flex-wrap: wrap; }
+  .pill {
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 2px 9px; font-size: 12px; color: var(--muted); white-space: nowrap;
+  }
+  .pill.ok { color: var(--mint); border-color: rgba(61, 220, 151, .35); }
+  .pill.err { color: var(--err); border-color: rgba(239, 107, 107, .4); }
+  .pill.tor { color: var(--warn); border-color: rgba(240, 184, 90, .4); }
+  .grow { flex: 1; }
+  .addr { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; max-width: 360px; white-space: nowrap; }
+  .layout {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr) 340px;
+    gap: 14px;
+    padding: 14px;
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+  }
+  .panel {
+    background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    display: flex; flex-direction: column; min-height: 0;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--line);
+    color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+  }
+  .panel-head strong { color: var(--text); text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .panel-body { padding: 10px; overflow-y: auto; min-height: 0; }
+  .contacts { display: flex; flex-direction: column; gap: 4px; }
+  .contact {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 9px; border-radius: 9px; cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .contact:hover { background: #0f1c24; }
+  .contact.active { background: rgba(61, 220, 151, .08); border-color: rgba(61, 220, 151, .35); }
+  .contact .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .contact .sub { color: var(--muted); font-size: 11px; }
+  .contact .unread {
+    margin-left: auto; background: var(--mint); color: #04110b;
+    font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px;
+  }
+  .mini-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .mini-form .row { display: flex; gap: 6px; }
+  .mini-form input { flex: 1; min-width: 0; }
+  .chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 9px; scroll-behavior: smooth; }
+  .empty { color: var(--muted); text-align: center; margin: auto; max-width: 420px; }
+  .msg { max-width: 78%; border: 1px solid var(--line); border-radius: 12px; padding: 8px 11px; background: #0e1a22; position: relative; }
+  .msg.out { align-self: flex-end; border-color: rgba(61, 220, 151, .28); background: rgba(61, 220, 151, .07); }
+  .msg.in { align-self: flex-start; }
+  .msg-head { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 11px; margin-bottom: 3px; flex-wrap: wrap; }
+  .msg-head .peer { color: var(--blue); }
+  .msg .text { white-space: pre-wrap; word-break: break-word; }
+  .msg .armor {
+    white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--warn);
+    background: #0a1218; border: 1px dashed rgba(240, 184, 90, .35); border-radius: 8px;
+    padding: 7px 8px; margin-top: 4px; max-height: 150px; overflow: auto;
+  }
+  .msg .meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .tag.mint { color: var(--mint); border-color: rgba(61, 220, 151, .3); }
+  .tag.warn { color: var(--warn); border-color: rgba(240, 184, 90, .3); }
+  .composer { border-top: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .composer .row { display: flex; gap: 8px; align-items: center; }
+  .composer input.to { flex: 1; min-width: 0; }
+  .composer textarea { resize: vertical; min-height: 58px; max-height: 220px; }
+  .composer .hint { color: var(--muted); font-size: 11px; }
+  .inspector .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 8px; font-size: 12px; }
+  .inspector .kv div:nth-child(odd) { color: var(--muted); }
+  .inspector .kv div:nth-child(even) { word-break: break-all; }
+  .inspector h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+  .inspector pre {
+    background: #0a1218; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px; font-size: 11px; overflow: auto; max-height: 260px; white-space: pre-wrap; word-break: break-all;
+  }
+  #banner {
+    display: none; margin: 0 14px; margin-top: 12px; padding: 8px 12px; border-radius: 9px;
+    background: rgba(239, 107, 107, .1); border: 1px solid rgba(239, 107, 107, .4); color: #ffc9c9;
+    font-size: 12px;
+  }
+  #banner.show { display: block; }
+  #toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #16252f; border: 1px solid var(--line); border-radius: 9px;
+    padding: 8px 13px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none;
+    z-index: 20;
+  }
+  #toast.show { opacity: 1; }
+  .error-text { color: var(--err); }
+  .ok-text { color: var(--mint); }
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 240px minmax(0, 1fr); }
+    .inspector { display: none; }
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { max-height: 220px; }
+    .top { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot" id="phase-dot"></span>GrinMessenger <small>wallet console</small></div>
+  <div class="statusline">
+    <span class="pill" id="phase">connecting…</span>
+    <span class="pill" id="mode">—</span>
+    <span class="pill" id="api-label">walletd API</span>
+    <span class="addr mono" id="address" title="Messenger address"></span>
+    <span class="pill" id="unread-pill" style="display:none">0 unread</span>
+  </div>
+  <div class="grow"></div>
+  <button class="ghost small" id="refresh-btn" title="Refresh now">refresh</button>
+  <button class="ghost small" id="copy-address">copy address</button>
+  <button class="ghost small" id="mark-read">mark read</button>
+</header>
+<div id="banner"></div>
+<main class="layout">
+  <aside class="panel sidebar">
+    <div class="panel-head"><strong>Peers</strong><span class="grow"></span><span id="peer-count">0</span></div>
+    <div class="panel-body">
+      <div class="contacts" id="contacts"></div>
+      <div class="mini-form">
+        <div class="row">
+          <input id="new-name" placeholder="name (e.g. Bob)" maxlength="64">
+        </div>
+        <div class="row">
+          <input id="new-address" class="mono" placeholder="tgrin1… / grin1…">
+          <button id="add-contact">add</button>
+        </div>
+        <div class="hint">Contacts are stored by the wallet daemon, not by this page.</div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="panel chat">
+    <div class="panel-head">
+      <strong id="chat-title">Conversation</strong>
+      <span class="grow"></span>
+      <span id="chat-count" class="pill">0</span>
+      <button class="ghost small" id="all-peers">all peers</button>
+    </div>
+    <div class="messages" id="messages">
+      <div class="empty">Waiting for the wallet daemon…<br><span class="mono small" id="empty-address"></span></div>
+    </div>
+    <div class="composer">
+      <div class="row">
+        <input class="to mono" id="to" placeholder="recipient address (tgrin1… / grin1…)" list="peer-addresses">
+        <datalist id="peer-addresses"></datalist>
+        <select id="kind">
+          <option value="text">text</option>
+          <option value="slatepack">Slatepack</option>
+        </select>
+      </div>
+      <textarea id="body" placeholder="Message text…" rows="2"></textarea>
+      <div class="row">
+        <span class="hint" id="composer-hint">Text messages are end-to-end encrypted envelopes.</span>
+        <span class="grow"></span>
+        <button class="ghost small" id="clear-composer">clear</button>
+        <button class="primary" id="send">send</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel inspector">
+    <div class="panel-head"><strong>Inspector</strong><span class="grow"></span><span id="inspector-kind" class="pill" style="display:none"></span></div>
+    <div class="panel-body" id="inspector">
+      <div class="kv">
+        <div>phase</div><div id="i-phase">—</div>
+        <div>mode</div><div id="i-mode">—</div>
+        <div>network</div><div id="i-network">—</div>
+        <div>address</div><div id="i-address" class="mono">—</div>
+        <div>onion</div><div id="i-onion" class="mono">—</div>
+        <div>unread</div><div id="i-unread">—</div>
+        <div>last poll</div><div id="i-poll">—</div>
+        <div>api</div><div id="i-api">—</div>
+      </div>
+      <div id="i-detail" style="display:none">
+        <h4>Selected message</h4>
+        <div class="kv" id="i-msg"></div>
+        <pre id="i-payload"></pre>
+        <div class="row" style="display:flex;gap:6px">
+          <button class="ghost small" id="copy-payload">copy payload</button>
+          <button class="ghost small" id="copy-id">copy id</button>
+        </div>
+      </div>
+      <div id="i-last-error" class="error-text small" style="margin-top:12px"></div>
+      <div class="hint" style="margin-top:12px">
+        This console talks to <code>flintmsg-walletd</code> through a same-origin proxy;
+        the bearer token is injected server-side and never appears in this page.
+      </div>
+    </div>
+  </aside>
+</main>
+<div id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const S = {
+    meta: null,
+    status: null,
+    identity: null,
+    contacts: [],
+    messages: [],
+    unread: { total: 0, peers: {} },
+    selectedPeer: null,
+    selectedMessage: null,
+    epoch: null,
+    lastError: null,
+    timer: null,
+  };
+  const $ = (id) => document.getElementById(id);
+  const esc = (value) => String(value == null ? '' : value)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  const short = (address) => {
+    const text = String(address || '');
+    return text.length > 18 ? `${text.slice(0, 10)}…${text.slice(-6)}` : text;
+  };
+  const fmtTime = (seconds) => {
+    try { return new Date(seconds * 1000).toLocaleString(); } catch { return String(seconds); }
+  };
+  const toast = (text, ok = true) => {
+    const el = $('toast');
+    el.textContent = text;
+    el.style.color = ok ? 'var(--mint)' : 'var(--err)';
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+  };
+  const banner = (text) => {
+    const el = $('banner');
+    if (!text) { el.classList.remove('show'); el.textContent = ''; return; }
+    el.textContent = text;
+    el.classList.add('show');
+  };
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      cache: 'no-store',
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    });
+    const text = await response.text();
+    let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch { json = { error: text }; }
+    if (!response.ok) throw new Error((json && json.error) || `HTTP ${response.status}`);
+    return json;
+  }
+  async function copy(text) {
+    try { await navigator.clipboard.writeText(text); toast('copied'); }
+    catch { toast('clipboard unavailable', false); }
+  }
+
+  function setPhase() {
+    const status = S.status || {};
+    const phase = status.phase || 'starting';
+    $('phase').textContent = phase;
+    $('phase').className = 'pill ' + (phase === 'ready' ? 'ok' : phase === 'error' ? 'err' : 'tor');
+    $('phase-dot').style.background = phase === 'ready' ? 'var(--mint)' : phase === 'error' ? 'var(--err)' : 'var(--warn)';
+    $('mode').textContent = status.mode || '—';
+    $('api-label').textContent = S.meta ? `api ${S.meta.api}` : 'walletd API';
+    $('api-label').title = status.detail || '';
+    $('address').textContent = status.address || '';
+    $('address').title = status.address || '';
+    const emptyAddress = $('empty-address');
+    if (emptyAddress) emptyAddress.textContent = status.address || '';
+    const total = (S.unread && S.unread.total) || 0;
+    $('unread-pill').style.display = total > 0 ? 'inline-block' : 'none';
+    $('unread-pill').textContent = `${total} unread`;
+    $('i-phase').textContent = phase;
+    $('i-mode').textContent = status.mode || '—';
+    $('i-network').textContent = status.network || '—';
+    $('i-address').textContent = status.address || '—';
+    $('i-onion').textContent = status.onion || '—';
+    $('i-unread').textContent = total;
+    $('i-poll').textContent = status.last_poll_unix ? fmtTime(status.last_poll_unix) : '—';
+    $('i-api').textContent = S.meta ? S.meta.api : '—';
+    $('i-last-error').textContent = status.last_error ? `last error: ${status.last_error}` : '';
+  }
+
+  function peerList() {
+    const peers = new Map();
+    for (const contact of S.contacts) {
+      peers.set(contact.address, { address: contact.address, name: contact.name || short(contact.address), contact: true });
+    }
+    for (const message of S.messages) {
+      if (!peers.has(message.peer)) {
+        peers.set(message.peer, { address: message.peer, name: short(message.peer), contact: false });
+      }
+    }
+    return [...peers.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function renderContacts() {
+    const peers = peerList();
+    $('peer-count').textContent = peers.length;
+    const list = $('contacts');
+    list.innerHTML = '';
+    if (!peers.length) {
+      list.innerHTML = '<div class="hint">No peers yet. Add a contact or receive a message.</div>';
+    }
+    for (const peer of peers) {
+      const div = document.createElement('div');
+      div.className = 'contact' + (S.selectedPeer === peer.address ? ' active' : '');
+      const unread = (S.unread.peers && S.unread.peers[peer.address]) || 0;
+      div.innerHTML = `<div><div class="name">${esc(peer.name)}${peer.contact ? '' : ' <span class="tag">msg</span>'}</div>
+        <div class="sub mono">${esc(short(peer.address))}</div></div>
+        ${unread ? `<span class="unread">${unread}</span>` : ''}`;
+      div.onclick = () => { S.selectedPeer = S.selectedPeer === peer.address ? null : peer.address; renderAll(); };
+      list.appendChild(div);
+    }
+    const datalist = $('peer-addresses');
+    datalist.innerHTML = peers.map((peer) => `<option value="${esc(peer.address)}">${esc(peer.name)}</option>`).join('');
+    if (S.selectedPeer && !peers.some((peer) => peer.address === S.selectedPeer)) S.selectedPeer = null;
+  }
+
+  function filteredMessages() {
+    return S.messages.filter((message) => !S.selectedPeer || message.peer === S.selectedPeer);
+  }
+
+  function renderMessages() {
+    const container = $('messages');
+    const messages = filteredMessages();
+    $('chat-count').textContent = messages.length;
+    $('chat-title').textContent = S.selectedPeer ? `Conversation · ${short(S.selectedPeer)}` : 'All conversations';
+    if (!messages.length) {
+      container.innerHTML = `<div class="empty">No messages yet.<br>Send a text or Slatepack below, or add a contact.</div>`;
+      return;
+    }
+    const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
+    container.innerHTML = messages.map((message, index) => {
+      const outgoing = message.direction === 'outgoing';
+      let body;
+      if (message.kind === 'slatepack') {
+        body = `<div class="armor mono">${esc(message.armor || '')}</div>`;
+      } else {
+        body = `<div class="text">${esc(message.text || '')}</div>`;
+      }
+      return `<div class="msg ${outgoing ? 'out' : 'in'}" data-index="${index}" title="click to inspect">
+        <div class="msg-head">
+          <span class="peer mono">${esc(outgoing ? 'to ' + short(message.peer) : 'from ' + short(message.peer))}</span>
+          <span>${esc(fmtTime(message.created_at))}</span>
+          <span class="tag ${message.kind === 'slatepack' ? 'warn' : 'mint'}">${esc(message.kind)}</span>
+          ${outgoing ? '<span class="tag">out</span>' : '<span class="tag">in</span>'}
+        </div>
+        ${body}
+        <div class="meta">
+          <span class="tag mono">seq ${esc(message.seq)}</span>
+          <span class="tag mono">${esc(short(message.id))}</span>
+          ${message.kind === 'slatepack' ? '<span class="tag mint">encrypted</span>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.msg').forEach((element) => {
+      element.onclick = () => {
+        const message = filteredMessages()[Number(element.dataset.index)];
+        if (message) { S.selectedMessage = message; renderInspector(); }
+      };
+    });
+    if (nearBottom) container.scrollTop = container.scrollHeight;
+  }
+
+  function renderInspector() {
+    const message = S.selectedMessage;
+    const detail = $('i-detail');
+    const kind = $('inspector-kind');
+    if (!message) {
+      detail.style.display = 'none';
+      kind.style.display = 'none';
+      return;
+    }
+    detail.style.display = 'block';
+    kind.style.display = 'inline-block';
+    kind.textContent = message.kind;
+    const payload = message.kind === 'slatepack' ? message.armor : message.text;
+    $('i-msg').innerHTML = `
+      <div>seq</div><div class="mono">${esc(message.seq)}</div>
+      <div>id</div><div class="mono">${esc(message.id)}</div>
+      <div>peer</div><div class="mono">${esc(message.peer)}</div>
+      <div>direction</div><div>${esc(message.direction)}</div>
+      <div>kind</div><div>${esc(message.kind)}</div>
+      <div>created</div><div>${esc(fmtTime(message.created_at))}</div>
+      <div>expires</div><div>${esc(message.expires_at ? fmtTime(message.expires_at) : '—')}</div>`;
+    $('i-payload').textContent = payload || '';
+  }
+
+  function renderInspectorStatus() {
+    if (!S.selectedMessage) renderInspector();
+  }
+
+  function renderAll() {
+    setPhase();
+    renderContacts();
+    renderMessages();
+    renderInspectorStatus();
+  }
+
+  async function refresh() {
+    try {
+      const [meta, status, identity, contacts, unread] = await Promise.all([
+        S.meta ? Promise.resolve(S.meta) : api('/api/meta'),
+        api('/api/v1/status'),
+        api('/api/v1/identity'),
+        api('/api/v1/contacts'),
+        api('/api/v1/unread'),
+      ]);
+      S.meta = meta; S.status = status; S.identity = identity;
+      S.contacts = contacts.contacts || [];
+      S.unread = unread;
+      const messages = await api('/api/v1/messages?after=0&limit=1000');
+      S.epoch = messages.epoch;
+      S.messages = messages.messages || [];
+      S.lastError = null;
+      banner(null);
+      renderAll();
+    } catch (error) {
+      S.lastError = error.message;
+      banner(`Wallet daemon unavailable: ${error.message}. Is flintmsg-walletd running?`);
+      $('phase').textContent = 'offline';
+      $('phase').className = 'pill err';
+      $('phase-dot').style.background = 'var(--err)';
+    }
+  }
+
+  async function sendMessage() {
+    const to = $('to').value.trim();
+    const kind = $('kind').value;
+    const body = $('body').value;
+    if (!to) return toast('recipient address is required', false);
+    if (!body.trim()) return toast(kind === 'slatepack' ? 'Slatepack armor is required' : 'message text is required', false);
+    const payload = kind === 'slatepack'
+      ? { to, kind: 'slatepack', armor: body }
+      : { to, kind: 'text', text: body };
+    $('send').disabled = true;
+    try {
+      const result = await api('/api/v1/send', { method: 'POST', body: JSON.stringify(payload) });
+      toast(`sent ${result.message.kind} ${short(result.message.id)}`);
+      $('body').value = '';
+      await refresh();
+    } catch (error) {
+      toast(`send failed: ${error.message}`, false);
+    } finally {
+      $('send').disabled = false;
+    }
+  }
+
+  async function addContact() {
+    const address = $('new-address').value.trim();
+    const name = $('new-name').value.trim();
+    if (!address || !name) return toast('address and name are required', false);
+    try {
+      await api('/api/v1/contacts', { method: 'POST', body: JSON.stringify({ address, name }) });
+      toast('contact saved');
+      $('new-address').value = ''; $('new-name').value = '';
+      await refresh();
+    } catch (error) {
+      toast(`contact failed: ${error.message}`, false);
+    }
+  }
+
+  async function markRead() {
+    const peer = S.selectedPeer || S.messages.find((m) => m.direction === 'incoming')?.peer;
+    if (!peer) return toast('no peer to mark read', false);
+    try {
+      await api('/api/v1/read', { method: 'POST', body: JSON.stringify({ peer }) });
+      toast('marked read');
+      await refresh();
+    } catch (error) {
+      toast(`mark read failed: ${error.message}`, false);
+    }
+  }
+
+  function updateComposer() {
+    const kind = $('kind').value;
+    const slate = kind === 'slatepack';
+    $('composer-hint').textContent = slate
+      ? 'Paste encrypted Slatepack armor. The messenger transports it opaquely; the wallet finalizes it.'
+      : 'Text messages are end-to-end encrypted envelopes.';
+    $('body').placeholder = slate ? 'BEGINSLATEPACK.…' : 'Message text…';
+  }
+
+  function bind() {
+    $('refresh-btn').onclick = () => refresh();
+    $('all-peers').onclick = () => { S.selectedPeer = null; renderAll(); };
+    $('send').onclick = () => sendMessage();
+    $('kind').onchange = updateComposer;
+    $('add-contact').onclick = () => addContact();
+    $('mark-read').onclick = () => markRead();
+    $('copy-address').onclick = () => copy(S.status ? S.status.address : '');
+    $('copy-payload').onclick = () => {
+      const message = S.selectedMessage;
+      if (!message) return;
+      copy(message.kind === 'slatepack' ? message.armor : message.text);
+    };
+    $('copy-id').onclick = () => S.selectedMessage && copy(S.selectedMessage.id);
+    $('clear-composer').onclick = () => { $('body').value = ''; };
+    $('address').onclick = () => S.status && copy(S.status.address);
+    $('body').addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') sendMessage();
+    });
+    updateComposer();
+  }
+
+  bind();
+  refresh();
+  S.timer = setInterval(refresh, 2000);
+})();
+</script>
+</body>
+</html>

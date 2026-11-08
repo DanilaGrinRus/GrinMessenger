@@ -90,8 +90,15 @@ origin.
 10. Wallet integration layer (2026-11-08): `crates/flint-messenger-wallet`
     provides a wallet-facing `WalletService` (seed derivation, encrypted
     history/contacts/read markers, message/event cursors) and the
-    `flintmsg-walletd` loopback sidecar API. It transports wallet-provided
-    Slatepack armor opaquely and links no wallet RPC or spending-key code.
+    `flintmsg-walletd` loopback sidecar API, plus the `flintmsg-wallet-ui`
+    developer console. It transports wallet-provided Slatepack armor opaquely and
+    links no wallet RPC or spending-key code.
+11. Security hardening (2026-11-08): UI/console Host/Origin/session-token
+    guards, signed relay mailbox fetch proofs, canonical UUID handling,
+    direct-mode queue-based inbound DoS mitigation, owner-only secret-file
+    creation (Unix atomically, Windows ACL hardening for the wallet daemon). See
+    `docs/SECURITY.md`; the envelope wire format is unchanged (sender-anonymity
+    limitation documented for v1).
 
 ## Reproducing the provenance check
 

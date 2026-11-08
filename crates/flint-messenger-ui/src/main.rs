@@ -12,8 +12,21 @@
 //!   messages from a loopback gateway and deliver outgoing envelopes to the
 //!   recipient's onion.
 //!
-//! The server binds to loopback by default. There is no authentication: it is a
-//! single-user local tool, do not expose it to a network.
+//! The server refuses non-loopback binds. It is a single-user local tool, and
+//! because any web page in the user's browser can reach loopback, the API is
+//! guarded against cross-site requests and DNS rebinding:
+//!
+//! * a random per-start session token (printed as the `#token=` fragment of
+//!   `UI_URL`, never sent in a URL to the server) is required in the
+//!   `X-Flint-UI-Token` header for every `/api/*` call except `/api/health`;
+//! * the `Host` header must name the bound loopback address
+//!   (`127.0.0.1:PORT`, `localhost:PORT` or `[::1]:PORT`), and a present
+//!   `Origin` must be `http://` + one of those hosts;
+//! * `POST` bodies must be `application/json` (no CORS-"simple" form/text posts).
+//!
+//! The custom header alone already forces a CORS preflight that this server
+//! never answers, so cross-origin scripts cannot call the API even if they
+//! learn the port.
 
 #![forbid(unsafe_code)]
 
@@ -40,6 +53,10 @@ const MAX_BODY: usize = 1024 * 1024;
 const MAX_MESSAGES: usize = 1000;
 const STATE_MESSAGES: usize = 200;
 const MAX_TEXT: usize = 8192;
+/// Header that carries the per-start session token.
+const TOKEN_HEADER: &str = "x-flint-ui-token";
+/// Optional fixed token for supervisors/tests (at least 32 URL-safe chars).
+const TOKEN_ENV: &str = "FLINTMSG_UI_TOKEN";
 
 // ---------- options ----------
 
@@ -66,7 +83,8 @@ OPTIONS:
   --identity <file>   identity JSON; created inside --data when missing
   --network <name>    network for a newly created identity (tgrin default)
   --data <dir>        data directory (history.json, contacts.json, mailbox)
-  --listen <addr>     loopback bind address (default 127.0.0.1:0)
+  --listen <addr>     loopback bind address (default 127.0.0.1:0);
+                      non-loopback addresses are refused
   --relay <url>       relay mode; without it the UI runs a direct Arti onion
   --plain             relay/cleartext transport (no Tor) for --relay
   --tor-state <dir>   Arti state directory
@@ -74,9 +92,14 @@ OPTIONS:
   --help              show this help
 
 The server prints machine-readable lines on startup:
-  UI_URL=http://127.0.0.1:PORT/
+  UI_URL=http://127.0.0.1:PORT/#token=…   (open this exact URL)
   ADDRESS=tgrin1…
   ONION=…onion
+
+Security: the API requires the session token from UI_URL in the
+X-Flint-UI-Token header, a loopback Host header and JSON request bodies.
+A fresh token is generated on every start; set FLINTMSG_UI_TOKEN (at least
+32 characters of [A-Za-z0-9_-]) to pin it for a supervisor.
 "
 }
 
@@ -203,7 +226,7 @@ fn load_or_create_identity(path: &Path, network: &str) -> Result<(Identity, [u8;
         };
         let text =
             serde_json::to_string_pretty(&file).map_err(|e| format!("identity JSON: {e}"))?;
-        fs::write(path, format!("{text}\n"))
+        write_private_file(path, format!("{text}\n").as_bytes(), true)
             .map_err(|e| format!("identity {}: {e}", path.display()))?;
         (seed, network.to_string())
     };
@@ -231,10 +254,35 @@ struct MessageRecord {
     route: String,
 }
 
+/// Write a file readable only by the owner on Unix (`0600`). With `create_new`
+/// an existing file is never overwritten (the identity seed must not be
+/// clobbered by a racing second process). On Windows the file inherits the
+/// ACL of the data directory, so keep `--data` inside the user's profile.
+fn write_private_file(path: &Path, bytes: &[u8], create_new: bool) -> std::io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true);
+    if create_new {
+        options.create_new(true);
+    } else {
+        options.create(true).truncate(true);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
 fn save_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     let tmp = path.with_extension("json.tmp");
     let text = serde_json::to_vec_pretty(value).map_err(|e| format!("json: {e}"))?;
-    fs::write(&tmp, text).map_err(|e| format!("write {}: {e}", tmp.display()))?;
+    // History and contacts hold plaintext messages: keep them owner-only. The
+    // mode applies only on creation, so drop a stale temp file first.
+    let _ = fs::remove_file(&tmp);
+    write_private_file(&tmp, &text, false).map_err(|e| format!("write {}: {e}", tmp.display()))?;
     fs::rename(&tmp, path).map_err(|e| format!("rename {}: {e}", path.display()))?;
     Ok(())
 }
@@ -263,6 +311,8 @@ struct Shared {
     plain: bool,
     listen: String,
     mode_label: String,
+    /// Per-start session token required by `/api/*` (see module docs).
+    token: String,
     history: Mutex<Vec<MessageRecord>>,
     contacts: Mutex<Vec<Contact>>,
     status: Mutex<Status>,
@@ -411,10 +461,13 @@ fn start_direct(shared: &Shared, tor_config: &TorConfig) -> Result<(), String> {
         require_signed_ack: true,
         require_pow: true,
         ttl_secs: 12 * 60 * 60,
-        max_per_recipient: 30,
-        max_total: 1_000,
+        max_per_recipient: 500,
+        max_total: 5_000,
         max_payload: 32 * 1024,
         max_posts_per_minute: 30,
+        // All Tor senders share 127.0.0.1, so a shared rate bucket is a cheap
+        // inbound DoS. Direct mode uses the larger queue + PoW + poll/ack.
+        enforce_post_rate: false,
         ..GatewayConfig::default()
     })
     .map_err(|e| format!("gateway: {e}"))?;
@@ -456,7 +509,7 @@ fn poll_loop(shared: Arc<Shared>, poll_secs: u64) {
             }
         };
         let now = flint_messenger::envelope::unix_now();
-        let envelopes = match transport.fetch(shared.identity.address(), now, 50) {
+        let envelopes = match transport.fetch_signed(&shared.identity, now, 50) {
             Ok(v) => v,
             Err(e) => {
                 let mut status = lock(&shared.status);
@@ -792,7 +845,24 @@ fn route(shared: &Shared, method: &str, path: &str, body: &[u8]) -> (u16, &'stat
     (404, "text/plain; charset=utf-8", b"not found".to_vec())
 }
 
-fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String, Vec<u8>)> {
+struct Request {
+    method: String,
+    path: String,
+    /// Header names are lower-cased; values are trimmed.
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl Request {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+}
+
+fn read_request(stream: &mut TcpStream) -> std::io::Result<Request> {
     stream.set_read_timeout(Some(Duration::from_secs(10)))?;
     let mut data: Vec<u8> = Vec::new();
     let mut buffer = [0u8; 4096];
@@ -822,12 +892,16 @@ fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String, Vec<
     let method = parts.next().unwrap_or("").to_string();
     let full_path = parts.next().unwrap_or("/").to_string();
     let path = full_path.split('?').next().unwrap_or("/").to_string();
+    let mut headers = Vec::new();
     let mut content_length = 0usize;
     for line in lines {
         if let Some((name, value)) = line.split_once(':') {
-            if name.eq_ignore_ascii_case("content-length") {
-                content_length = value.trim().parse().unwrap_or(0);
+            let name = name.trim().to_ascii_lowercase();
+            let value = value.trim().to_string();
+            if name == "content-length" {
+                content_length = value.parse().unwrap_or(0);
             }
+            headers.push((name, value));
         }
     }
     if content_length > MAX_BODY {
@@ -848,7 +922,12 @@ fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String, Vec<
         }
     }
     body.truncate(content_length.min(MAX_BODY));
-    Ok((method, path, body))
+    Ok(Request {
+        method,
+        path,
+        headers,
+        body,
+    })
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -858,6 +937,95 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
+}
+
+// ---------- request guard (CSRF / DNS rebinding) ----------
+
+/// `Host` values accepted for a listener bound to `addr`. Only the exact port
+/// is accepted, so a rebinding attacker's own hostname never matches.
+fn allowed_hosts(addr: std::net::SocketAddr) -> Vec<String> {
+    let port = addr.port();
+    let mut hosts = vec![format!("localhost:{port}")];
+    match addr.ip() {
+        std::net::IpAddr::V4(ip) => hosts.push(format!("{ip}:{port}")),
+        std::net::IpAddr::V6(ip) => hosts.push(format!("[{ip}]:{port}")),
+    }
+    hosts
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0u8, |diff, (a, b)| diff | (a ^ b))
+        == 0
+}
+
+/// Reject a request before routing. Returns `(status, error)` on rejection.
+fn guard(request: &Request, token: &str, hosts: &[String]) -> Option<(u16, &'static str)> {
+    // DNS rebinding: the browser sends the attacker's hostname in Host.
+    let host_ok = request
+        .header("host")
+        .map(|host| {
+            hosts
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(host))
+        })
+        .unwrap_or(false);
+    if !host_ok {
+        return Some((403, "host not allowed"));
+    }
+    // Cross-site requests: browsers attach Origin to POST and to CORS fetches.
+    if let Some(origin) = request.header("origin") {
+        let origin_ok = hosts
+            .iter()
+            .any(|allowed| origin.eq_ignore_ascii_case(&format!("http://{allowed}")));
+        if !origin_ok {
+            return Some((403, "origin not allowed"));
+        }
+    }
+    if !request.path.starts_with("/api/") || request.path == "/api/health" {
+        return None;
+    }
+    let token_ok = request
+        .header(TOKEN_HEADER)
+        .map(|provided| constant_time_eq(provided.as_bytes(), token.as_bytes()))
+        .unwrap_or(false);
+    if !token_ok {
+        return Some((401, "missing or invalid session token"));
+    }
+    if request.method == "POST" {
+        let json = request
+            .header("content-type")
+            .and_then(|value| value.split(';').next())
+            .map(|mime| mime.trim().eq_ignore_ascii_case("application/json"))
+            .unwrap_or(false);
+        if !json {
+            return Some((415, "content-type must be application/json"));
+        }
+    }
+    None
+}
+
+fn session_token() -> Result<String, String> {
+    if let Ok(token) = std::env::var(TOKEN_ENV) {
+        let token = token.trim().to_string();
+        let valid = token.len() >= 32
+            && token
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+        if !valid {
+            return Err(format!(
+                "{TOKEN_ENV}: expected at least 32 characters of [A-Za-z0-9_-]"
+            ));
+        }
+        return Ok(token);
+    }
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).map_err(|e| format!("RNG: {e}"))?;
+    Ok(data_encoding::HEXLOWER.encode(&bytes))
 }
 
 fn write_response(
@@ -870,8 +1038,11 @@ fn write_response(
         200 => "OK",
         204 => "No Content",
         400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        415 => "Unsupported Media Type",
         500 => "Internal Server Error",
         _ => "Response",
     };
@@ -883,7 +1054,7 @@ fn write_response(
          X-Content-Type-Options: nosniff\r\n\
          X-Frame-Options: DENY\r\n\
          Referrer-Policy: no-referrer\r\n\
-         Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'\r\n\
+         Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\r\n\
          Connection: close\r\n\r\n",
         body.len()
     );
@@ -892,9 +1063,9 @@ fn write_response(
     stream.flush()
 }
 
-fn handle_connection(mut stream: TcpStream, shared: Arc<Shared>) {
+fn handle_connection(mut stream: TcpStream, shared: Arc<Shared>, hosts: Arc<Vec<String>>) {
     let result = (|| -> std::io::Result<()> {
-        let (method, path, body) = match read_request(&mut stream) {
+        let request = match read_request(&mut stream) {
             Ok(request) => request,
             Err(_) => {
                 return write_response(
@@ -905,10 +1076,7 @@ fn handle_connection(mut stream: TcpStream, shared: Arc<Shared>) {
                 );
             }
         };
-        let allowed = match method.as_str() {
-            "GET" | "POST" => true,
-            _ => false,
-        };
+        let allowed = matches!(request.method.as_str(), "GET" | "POST");
         if !allowed {
             return write_response(
                 &mut stream,
@@ -917,7 +1085,18 @@ fn handle_connection(mut stream: TcpStream, shared: Arc<Shared>) {
                 b"{\"ok\":false,\"error\":\"method not allowed\"}",
             );
         }
-        let (status, content_type, response_body) = route(&shared, &method, &path, &body);
+        if let Some((status, error)) = guard(&request, &shared.token, &hosts) {
+            let body =
+                serde_json::to_vec(&json!({"ok": false, "error": error})).unwrap_or_default();
+            return write_response(
+                &mut stream,
+                status,
+                "application/json; charset=utf-8",
+                &body,
+            );
+        }
+        let (status, content_type, response_body) =
+            route(&shared, &request.method, &request.path, &request.body);
         write_response(&mut stream, status, content_type, &response_body)
     })();
     if let Err(error) = result {
@@ -931,7 +1110,14 @@ fn serve(shared: Arc<Shared>) -> Result<(), String> {
     let addr = listener
         .local_addr()
         .map_err(|e| format!("local_addr: {e}"))?;
-    println!("UI_URL=http://{addr}/");
+    if !addr.ip().is_loopback() {
+        return Err(format!(
+            "refusing to listen on non-loopback address {addr}: the UI holds the identity and \
+             plaintext history and must stay local"
+        ));
+    }
+    let hosts = Arc::new(allowed_hosts(addr));
+    println!("UI_URL=http://{}/#token={}", hosts[1], shared.token);
     println!("ADDRESS={}", shared.address);
     println!("ONION={}.onion", shared.onion);
     println!("MODE={}", shared.mode_label);
@@ -941,7 +1127,8 @@ fn serve(shared: Arc<Shared>) -> Result<(), String> {
         match connection {
             Ok(stream) => {
                 let shared = Arc::clone(&shared);
-                thread::spawn(move || handle_connection(stream, shared));
+                let hosts = Arc::clone(&hosts);
+                thread::spawn(move || handle_connection(stream, shared, hosts));
             }
             Err(error) => {
                 eprintln!("flintmsg-ui: accept: {error}");
@@ -974,6 +1161,13 @@ fn main() {
             std::process::exit(1);
         }
     };
+    let token = match session_token() {
+        Ok(token) => token,
+        Err(error) => {
+            eprintln!("flintmsg-ui: {error}");
+            std::process::exit(2);
+        }
+    };
     let address = identity.address().to_string();
     let onion = flint_tor_arti::onion_address(&seed);
     let mode_label = match &options.relay {
@@ -1004,6 +1198,7 @@ fn main() {
         plain: options.plain,
         listen: options.listen.clone(),
         mode_label,
+        token,
         history: Mutex::new(history),
         contacts: Mutex::new(contacts),
         status: Mutex::new(Status {

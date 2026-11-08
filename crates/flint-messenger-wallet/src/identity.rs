@@ -177,14 +177,100 @@ pub fn save_generated_identity(
     Ok((identity, seed, file.network))
 }
 
-/// Write a file that contains secret material and restrict it on Unix.
+/// Write a file that contains secret material and restrict it to the current
+/// user:
+///
+/// * Unix: create/open with mode `0600` *before* the seed/token bytes are
+///   written, and tighten an existing file before writing too. This removes the
+///   old "write then chmod" window in which another local user could read it.
+/// * Windows: create the file, remove inherited ACEs and grant the current user
+///   full control via `icacls` before writing the secret bytes. If ACL hardening
+///   fails the function fails closed instead of leaving an unprotected secret.
 pub fn write_secret_file(path: &Path, data: &[u8]) -> std::result::Result<(), String> {
-    fs::write(path, data).map_err(|e| format!("write {}: {e}", path.display()))?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = fs::Permissions::from_mode(0o600);
-        fs::set_permissions(path, perms).map_err(|e| format!("chmod {}: {e}", path.display()))?;
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)
+            .map_err(|e| format!("create {}: {e}", path.display()))?;
+        // `mode` only applies on creation; tighten a pre-existing file before
+        // any secret byte is written through this handle.
+        file.set_permissions(fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("chmod {}: {e}", path.display()))?;
+        file.write_all(data)
+            .map_err(|e| format!("write {}: {e}", path.display()))?;
+        file.sync_all()
+            .map_err(|e| format!("sync {}: {e}", path.display()))?;
+    }
+    #[cfg(not(unix))]
+    {
+        use std::io::Write;
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| format!("create {}: {e}", path.display()))?;
+        #[cfg(windows)]
+        harden_windows_acl(path)?;
+        file.write_all(data)
+            .map_err(|e| format!("write {}: {e}", path.display()))?;
+        file.sync_all()
+            .map_err(|e| format!("sync {}: {e}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// Best-effort-but-fail-closed Windows ACL hardening: remove inheritance and
+/// grant only the current account (plus SYSTEM, which needs service access).
+#[cfg(windows)]
+fn harden_windows_acl(path: &Path) -> std::result::Result<(), String> {
+    use std::process::Command;
+
+    let user = std::env::var("USERNAME").map_err(|_| "USERNAME is not set".to_string())?;
+    if user.is_empty() {
+        return Err("USERNAME is empty; cannot restrict the secret file ACL".into());
+    }
+    let account = match std::env::var("USERDOMAIN") {
+        Ok(domain) if !domain.is_empty() && !domain.eq_ignore_ascii_case("WORKGROUP") => {
+            format!("{domain}\\{user}")
+        }
+        _ => user,
+    };
+    let output = Command::new("icacls")
+        .arg(path)
+        .arg("/inheritance:r")
+        .arg("/grant:r")
+        .arg(format!("{account}:F"))
+        .output()
+        .map_err(|e| format!("icacls {}: {e}", path.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "icacls {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    // SYSTEM must still be able to read the file for OS services/backup.
+    let output = Command::new("icacls")
+        .arg(path)
+        .arg("/grant")
+        .arg("SYSTEM:F")
+        .output()
+        .map_err(|e| format!("icacls {}: {e}", path.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "icacls {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
     Ok(())
 }
@@ -230,6 +316,34 @@ mod tests {
         let b64 = data_encoding::BASE64.encode(&seed);
         assert_eq!(*parse_seed(&b64).unwrap(), seed);
         assert!(parse_seed("not a seed").is_err());
+    }
+
+    #[test]
+    fn secret_file_is_restricted_before_content_is_written() {
+        let dir = std::env::temp_dir().join(format!(
+            "flint-wallet-secret-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("secret");
+        write_secret_file(&path, b"seed-material").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"seed-material");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // Also starts from a pre-existing world-readable file: the writer
+            // must tighten it before writing the new secret.
+            std::fs::write(&path, b"old").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            write_secret_file(&path, b"new-seed").unwrap();
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "secret file must be 0600");
+        }
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

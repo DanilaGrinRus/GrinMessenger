@@ -1295,6 +1295,7 @@ dependencies = [
 name = "flint-gateway"
 version = "0.1.0"
 dependencies = [
+ "data-encoding",
  "flint-messenger",
  "serde",
  "serde_json",

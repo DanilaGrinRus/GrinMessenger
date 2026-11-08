@@ -134,7 +134,7 @@
     <article class="card status-card is-ready">
       <p class="status-tag">Available for testing</p>
       <h2>Build &amp; tests</h2>
-      <p>Offline build and the Rust test suite pass: 142 passed, 0 failed, 2 ignored (including the web-UI and wallet two-daemon integration tests).</p>
+      <p>Offline build and the Rust test suite pass: 154 passed, 0 failed, 2 ignored (including the web-UI, wallet two-daemon and security-guard tests).</p>
       <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
     </article>
     <article class="card status-card">
@@ -271,8 +271,9 @@ GET  /flint/v1/health       {ok:true}</pre>
         <ul>
           <li><code>flint-relay</code> stores opaque envelopes until TTL (default 26 h, max 7 days).</li>
           <li>PoW, quotas and rate limits protect the relay; ACKs are signed by the recipient.</li>
+          <li>Hardened relay: mailbox reads need a signed address proof, and message ids are canonical UUIDs (no case tricks).</li>
           <li>Works over Arti <code>.onion</code> or plain loopback for tests.</li>
-          <li>The relay can drop/duplicate messages and sees metadata — never the plaintext.</li>
+          <li>The relay can drop/duplicate messages and sees recipient metadata — never the payload.</li>
         </ul>
       </article>
     </div>
@@ -308,14 +309,17 @@ GET  /flint/v1/health       {ok:true}</pre>
         </p>
         <pre class="code">flintmsg-ui --data ui-data \
   --relay http://127.0.0.1:8080 --plain
-# prints UI_URL=http://127.0.0.1:PORT/ — open it
+# prints UI_URL=http://127.0.0.1:PORT/#token=… — open that URL
 
 # direct mode (needs the Tor network):
 flintmsg-ui --data ui-data</pre>
         <p class="small-note">
-          Loopback only, no authentication: it is a single-user local tool.
-          <code>history.json</code> and <code>contacts.json</code> are kept in
-          the data directory; the identity is created on first start.
+          Loopback only. The URL fragment contains a per-start session token;
+          <code>/api/*</code> requires it in <code>X-Flint-UI-Token</code>, the
+          <code>Host</code> header must be an exact loopback name, and a present
+          <code>Origin</code> must be same-origin (DNS-rebinding/CSRF guard).
+          <code>history.json</code> and <code>contacts.json</code> are owner-only
+          files; the identity is created on first start.
         </p>
       </div>
     </div>
@@ -358,6 +362,29 @@ curl -H "Authorization: Bearer &lt;token&gt;" \
           Every endpoint except <code>/v1/health</code> needs the bearer token;
           non-loopback binds are refused. API: status, identity, capabilities,
           contacts, messages, events, unread, send (text/slatepack), read.
+        </p>
+      </div>
+    </div>
+    <div class="cards-2" style="margin-top:14px">
+      <figure class="card" style="padding:10px;margin:0">
+        <img src="assets/wallet-ui.png" alt="GrinMessenger wallet console: peers, encrypted chat with a Slatepack message and an inspector panel">
+        <figcaption class="small" style="padding:8px 4px 2px">
+          Developer wallet console (<code>flintmsg-wallet-ui</code>) over the
+          sidecar API: token injected server-side, Host/Origin guarded, text and
+          opaque Slatepack messages.
+        </figcaption>
+      </figure>
+      <div>
+        <h3>Wallet console</h3>
+        <pre class="code">flintmsg-wallet-ui \
+  --api http://127.0.0.1:&lt;walletd-port&gt; \
+  --token-file wallet-data\messenger\api-token \
+  --listen 127.0.0.1:0
+# prints {"event":"ready","url":"http://127.0.0.1:PORT/"}</pre>
+        <p class="small-note">
+          Read-only token injection: the browser never sees the daemon token.
+          Details: <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/WALLET_INTEGRATION.md">wallet contract</a>
+          and <a href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/SECURITY.md">security notes</a>.
         </p>
       </div>
     </div>
@@ -447,9 +474,10 @@ let env = msg.send(&amp;id, &amp;recipient,
         <h3 class="ok">Verified</h3>
         <ul>
           <li>Offline build of the whole workspace</li>
-          <li>142 automated tests: protocol, gateway, CLI, web UI, wallet API, onion vectors</li>
-          <li>Web UI: integration tests with a real relay + live browser screenshot</li>
-          <li>Wallet integration: two real <code>flintmsg-walletd</code> processes exchange text + encrypted Slatepack through a real relay</li>
+          <li>154 automated tests: protocol, gateway, CLI, web UI, wallet API, console security, onion vectors</li>
+          <li>Web UI: session-token + Host/Origin guard; integration tests with a real relay + live browser screenshot</li>
+          <li>Wallet integration: two real <code>flintmsg-walletd</code> processes exchange text + encrypted Slatepack through a real relay; console proxy tested</li>
+          <li>Security hardening: signed relay fetch proofs, canonical UUIDs, direct-mode queue DoS mitigation, owner-only secret files</li>
           <li>Live Tor on a GCP VM: two real processes, direct onion delivery + signed ACK</li>
           <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
           <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
@@ -464,6 +492,9 @@ let env = msg.send(&amp;id, &amp;recipient,
           <li>Live Nostr transport (needs an external relay)</li>
           <li>Forward secrecy, groups, attachments</li>
           <li>Security audit; mainnet use</li>
+          <li>Relay mode: a known sender can be tested against the public v1 signature (not sender-anonymous); use direct mode for that threat</li>
+          <li>Reusing the wallet address-key seed links messenger/onion to the payment address — dedicated messaging seed only</li>
+          <li>Direct-mode sustained flood can still delay delivery (no per-sender authenticated quota in v1)</li>
           <li>Automatic wallet RPC / Slatepack processing — the wallet integration only transports wallet-provided armor</li>
           <li>iOS/mobile FFI build (wallet layer is a Rust crate + loopback sidecar)</li>
           <li>Persistent history in the CLI (the wallet daemon keeps encrypted history)</li>
@@ -471,7 +502,7 @@ let env = msg.send(&amp;id, &amp;recipient,
       </article>
     </div>
     <div class="facts">
-      <div class="fact"><strong>142</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
+      <div class="fact"><strong>154</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
       <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
       <div class="fact"><strong>1</strong><span>live Tor run on GCP: two processes, direct onion, signed ACK</span></div>
     </div>
@@ -500,7 +531,8 @@ let env = msg.send(&amp;id, &amp;recipient,
           third-party notices and build instructions.</p>
         <p><a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/PROTOCOL.md">Protocol</a>
            <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/ARCHITECTURE.md">Architecture</a>
-           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/WALLET_INTEGRATION.md">Wallet integration</a></p>
+           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/WALLET_INTEGRATION.md">Wallet integration</a>
+           <a class="btn" href="https://github.com/DanilaGrinRus/GrinMessenger/blob/main/docs/SECURITY.md">Security</a></p>
       </article>
       <article class="card">
         <h3>Evidence</h3>

@@ -74,11 +74,23 @@ pub struct GatewayConfig {
     /// Reject envelopes without a valid proof of work. The P2P listener and
     /// public relays set this; the default keeps internal tests/legacy simple.
     pub require_pow: bool,
+    /// Require a signed recipient proof on `GET /flint/v1/msg` (address +
+    /// timestamp + ed25519 signature). Without it anyone who learns an address
+    /// can read its mailbox metadata (count, sizes, timestamps, ids). Public
+    /// relays should enable this; the default keeps tests/legacy simple.
+    pub require_fetch_proof: bool,
     pub ttl_secs: u64,
     pub max_per_recipient: usize,
     pub max_total: usize,
     pub max_payload: usize,
     pub max_posts_per_minute: u32,
+    /// Enforce the post-rate limiter. Relay mode keeps it on. The direct-mode
+    /// loopback gateway turns it off: every Tor sender arrives from 127.0.0.1,
+    /// so a shared per-recipient rate bucket lets one cheap attacker (PoW is
+    /// only 18 bits) hold the bucket full and block legitimate incoming
+    /// messages. Direct mode instead uses a larger queue and relies on the
+    /// recipient's poll/ack loop plus proof of work to drain spam.
+    pub enforce_post_rate: bool,
 }
 
 impl Default for GatewayConfig {
@@ -88,11 +100,13 @@ impl Default for GatewayConfig {
             store_dir: None,
             require_signed_ack: false,
             require_pow: false,
+            require_fetch_proof: false,
             ttl_secs: DEFAULT_TTL_SECS,
             max_per_recipient: MAX_PER_RECIPIENT,
             max_total: MAX_TOTAL,
             max_payload: MAX_PAYLOAD,
             max_posts_per_minute: 120,
+            enforce_post_rate: true,
         }
     }
 }
@@ -260,14 +274,17 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
                     b"{\"error\":\"bad recipient\"}",
                 );
             }
-            if uuid::Uuid::parse_str(id).is_err() {
-                return write_response(
-                    &mut stream,
-                    400,
-                    "application/json",
-                    b"{\"error\":\"bad id\"}",
-                );
-            }
+            let id = match canonical_message_id(id) {
+                Some(id) => id,
+                None => {
+                    return write_response(
+                        &mut stream,
+                        400,
+                        "application/json",
+                        b"{\"error\":\"bad id\"}",
+                    )
+                }
+            };
             if payload.is_empty() || payload.len() > state.config.max_payload {
                 return write_response(
                     &mut stream,
@@ -290,7 +307,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
                 };
                 if envelope.pow_bits == 0
                     || envelope.recipient != to
-                    || envelope.id != id
+                    || !same_uuid(&envelope.id, &id)
                     || envelope
                         .verify_pow(flint_messenger::envelope::POW_MIN_BITS)
                         .is_err()
@@ -308,7 +325,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
                 .and_then(Value::as_u64)
                 .unwrap_or(state.config.ttl_secs);
             let ttl = requested.clamp(1, state.config.ttl_secs.max(1));
-            match store(&state, id, to, payload, ttl, peer) {
+            match store(&state, &id, to, payload, ttl, peer) {
                 Ok(message) => {
                     let body = serde_json::to_vec(
                         &json!({"id": message.id, "expires_at": message.expires_at}),
@@ -334,13 +351,44 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
         }
         ("GET", "/flint/v1/msg") => {
             let to = query_param(query, "to").unwrap_or_default();
-            if Address::parse(&to).is_err() {
-                return write_response(
-                    &mut stream,
-                    400,
-                    "application/json",
-                    b"{\"error\":\"bad recipient\"}",
-                );
+            let address = match Address::parse(&to) {
+                Ok(address) => address,
+                Err(_) => {
+                    return write_response(
+                        &mut stream,
+                        400,
+                        "application/json",
+                        b"{\"error\":\"bad recipient\"}",
+                    )
+                }
+            };
+            if state.config.require_fetch_proof {
+                let now = flint_messenger::envelope::unix_now();
+                let ts = query_param(query, "ts").and_then(|value| value.parse::<u64>().ok());
+                let signature = query_param(query, "sig").and_then(|value| {
+                    data_encoding::HEXLOWER
+                        .decode(value.to_ascii_lowercase().as_bytes())
+                        .ok()
+                        .and_then(|bytes| <[u8; 64]>::try_from(bytes.as_slice()).ok())
+                });
+                let proof_ok = match (ts, signature) {
+                    (Some(ts), Some(signature)) => {
+                        ts.abs_diff(now) <= MAX_SKEW_SECS
+                            && address.verify_bytes(
+                                &flint_messenger::address::fetch_proof_transcript(&address, ts),
+                                &signature,
+                            )
+                    }
+                    _ => false,
+                };
+                if !proof_ok {
+                    return write_response(
+                        &mut stream,
+                        401,
+                        "application/json",
+                        b"{\"error\":\"fetch proof required\"}",
+                    );
+                }
             }
             let limit = query_param(query, "limit")
                 .and_then(|value| value.parse::<usize>().ok())
@@ -368,17 +416,20 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
                 .trim_start_matches("/flint/v1/msg/")
                 .trim_end_matches("/ack")
                 .trim_end_matches('/');
-            if uuid::Uuid::parse_str(id).is_err() {
-                return write_response(
-                    &mut stream,
-                    400,
-                    "application/json",
-                    b"{\"error\":\"bad id\"}",
-                );
-            }
+            let id = match canonical_message_id(id) {
+                Some(id) => id,
+                None => {
+                    return write_response(
+                        &mut stream,
+                        400,
+                        "application/json",
+                        b"{\"error\":\"bad id\"}",
+                    )
+                }
+            };
             let value: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
             let to = value.get("to").and_then(Value::as_str).unwrap_or("");
-            if Address::parse(to).is_err() {
+            if let Err(_) = Address::parse(to) {
                 return write_response(
                     &mut stream,
                     400,
@@ -398,7 +449,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
             if let Some(proof) = proof.as_ref() {
                 let now = flint_messenger::envelope::unix_now();
                 let valid = proof.to == to
-                    && proof.id == id
+                    && same_uuid(&proof.id, &id)
                     && proof.ts.abs_diff(now) <= MAX_SKEW_SECS
                     && proof
                         .verify()
@@ -413,7 +464,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
                     );
                 }
             }
-            match ack(&state, id, to) {
+            match ack(&state, &id, to) {
                 Ok(true) => write_response(&mut stream, 200, "application/json", b"{\"ok\":true}"),
                 Ok(false) => write_response(
                     &mut stream,
@@ -457,17 +508,22 @@ fn store(
     // relay gets a per-source-IP budget; on loopback (Tor forwards every
     // connection from 127.0.0.1) that bucket would be shared by all senders and
     // is therefore skipped. Per-recipient and global queue quotas still apply.
-    if !peer.is_loopback()
-        && !allow_post_with(
-            state,
-            &format!("ip:{peer}"),
-            state.config.max_posts_per_minute,
-        )
-    {
-        return Err(PutError::Quota);
-    }
-    if !allow_post_with(state, to, state.config.max_posts_per_minute) {
-        return Err(PutError::Quota);
+    // Direct-mode gateways disable this limiter entirely: with all Tor senders
+    // behind 127.0.0.1 a shared bucket means one attacker blocks every peer;
+    // queue capacity + PoW + the recipient's ack/drain loop are used instead.
+    if state.config.enforce_post_rate {
+        if !peer.is_loopback()
+            && !allow_post_with(
+                state,
+                &format!("ip:{peer}"),
+                state.config.max_posts_per_minute,
+            )
+        {
+            return Err(PutError::Quota);
+        }
+        if !allow_post_with(state, to, state.config.max_posts_per_minute) {
+            return Err(PutError::Quota);
+        }
     }
     let now = now_millis();
     let mut guard = state
@@ -618,6 +674,26 @@ fn query_param(query: &str, key: &str) -> Option<String> {
     })
 }
 
+/// Canonical UUID form (lowercase, hyphenated). Message ids are compared and
+/// stored only in this form, so `AABB…` and `aabb…` cannot address two entries
+/// or bypass a lookup differently on case-sensitive and case-insensitive
+/// filesystems.
+fn canonical_message_id(raw: &str) -> Option<String> {
+    uuid::Uuid::parse_str(raw.trim())
+        .ok()
+        .map(|id| id.hyphenated().to_string())
+}
+
+fn same_uuid(left: &str, right: &str) -> bool {
+    match (
+        uuid::Uuid::parse_str(left.trim()),
+        uuid::Uuid::parse_str(right.trim()),
+    ) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
 /// Reduce an absolute-form request target (`http://host:port/path?query`) to the
 /// origin-form path used by the gateway router. Origin-form targets pass through
 /// unchanged.
@@ -738,7 +814,8 @@ pub fn wait_ready(gateway: &Gateway, timeout: Duration) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use flint_messenger::{Envelope, Identity, MessageKind, DEFAULT_TTL_SECS};
+    use flint_messenger::transport::GatewayTransport;
+    use flint_messenger::{Envelope, Identity, MessageKind, Transport, DEFAULT_TTL_SECS};
 
     fn addr(seed: u8) -> String {
         Address::from_key("tgrin", [seed; 32])
@@ -1444,5 +1521,113 @@ mod tests {
             "failed write leaked into memory: {body}"
         );
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn direct_mode_queue_does_not_share_the_relay_post_rate() {
+        // Direct-mode gateways see every Tor sender as 127.0.0.1. A shared
+        // per-recipient rate limiter there let one cheap attacker (18-bit PoW)
+        // hold the bucket and block legitimate traffic. The direct config
+        // disables the limiter and uses a larger queue instead.
+        let (_gateway, url) = start_gateway(GatewayConfig {
+            enforce_post_rate: false,
+            max_per_recipient: 500,
+            max_total: 5_000,
+            ..GatewayConfig::default()
+        });
+        let to = addr(21);
+        for n in 0..60 {
+            let (status, body) = put(&url, &to, &format!("burst-{n}"));
+            assert_eq!(status, 200, "burst message {n} was rate-limited: {body}");
+        }
+        // A legitimate message after the burst is still accepted.
+        let (status, body) = put(&url, &to, "legitimate-after-burst");
+        assert_eq!(
+            status, 200,
+            "legitimate message blocked after burst: {body}"
+        );
+    }
+
+    #[test]
+    fn mixed_case_message_ids_address_the_same_relay_entry() {
+        let (_gateway, url) = start_gateway(GatewayConfig::default());
+        let bob = Identity::generate("tgrin").expect("bob");
+        let to = bob.address().to_string();
+        let id = uuid::Uuid::new_v4().to_string();
+        let upper = id.to_uppercase();
+        let body = |id: &str| {
+            serde_json::to_string(&json!({
+                "id": id, "to": to, "payload": "ciphertext", "ttl_secs": 60
+            }))
+            .unwrap()
+        };
+        let (status, response) = post(&format!("{url}/flint/v1/msg"), &body(&upper));
+        assert_eq!(status, 200, "uppercase post: {response}");
+        let (status, response) = post(&format!("{url}/flint/v1/msg"), &body(&id));
+        assert_eq!(status, 200, "lowercase post: {response}");
+
+        let (_, listed) = get(&format!("{url}/flint/v1/msg?to={to}"));
+        let items = messages(&listed);
+        assert_eq!(items.len(), 1, "one canonical entry, not two: {listed}");
+        assert_eq!(items[0]["id"], id, "ids are returned canonical/lowercase");
+
+        let (status, response) = post(
+            &format!("{url}/flint/v1/msg/{upper}/ack"),
+            &serde_json::to_string(&json!({"to": to})).unwrap(),
+        );
+        assert_eq!(status, 200, "uppercase ack: {response}");
+        let (_, listed) = get(&format!("{url}/flint/v1/msg?to={to}"));
+        assert!(
+            messages(&listed).is_empty(),
+            "uppercase ack must delete the lowercase entry: {listed}"
+        );
+    }
+
+    #[test]
+    fn fetch_requires_a_signed_address_proof_when_enabled() {
+        let (_gateway, url) = start_gateway(GatewayConfig {
+            require_fetch_proof: true,
+            ..GatewayConfig::default()
+        });
+        let alice = Identity::generate("tgrin").expect("alice");
+        let bob = Identity::generate("tgrin").expect("bob");
+        let envelope = Envelope::seal_now(
+            &alice,
+            bob.address(),
+            MessageKind::Text {
+                text: "signed fetch".into(),
+            },
+            DEFAULT_TTL_SECS,
+        )
+        .expect("seal");
+        let payload = serde_json::to_string(&envelope).unwrap();
+        let to = bob.address().to_string();
+        let (status, response) = post(
+            &format!("{url}/flint/v1/msg"),
+            &serde_json::to_string(&json!({
+                "id": envelope.id, "to": to, "payload": payload, "ttl_secs": 60
+            }))
+            .unwrap(),
+        );
+        assert_eq!(status, 200, "{response}");
+
+        // Anonymous fetch: no address proof -> no mailbox metadata leak.
+        let (status, response) = get(&format!("{url}/flint/v1/msg?to={to}"));
+        assert_eq!(status, 401, "unsigned fetch must be rejected: {response}");
+        // Wrong signature is rejected too.
+        let now = flint_messenger::envelope::unix_now();
+        let (status, response) = get(&format!(
+            "{url}/flint/v1/msg?to={to}&ts={now}&sig={}",
+            "00".repeat(64)
+        ));
+        assert_eq!(status, 401, "forged proof must be rejected: {response}");
+
+        // The address holder signs and the mailbox content is returned.
+        let transport = GatewayTransport::new(&url).expect("transport");
+        let fetched = transport
+            .fetch_signed(&bob, flint_messenger::envelope::unix_now(), 10)
+            .expect("signed fetch");
+        assert_eq!(fetched.len(), 1);
+        assert_eq!(fetched[0].id, envelope.id);
     }
 }

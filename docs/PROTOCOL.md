@@ -111,26 +111,41 @@ gateway may enforce a stricter limit and clamps the stored message TTL.
 | API | Body / result |
 |---|---|
 | `POST /flint/v1/msg` | `{id,to,payload,ttl_secs}` → `{id,expires_at}` |
-| `GET /flint/v1/msg?to=address&limit=N` | messages `id/to/payload/created_at/expires_at`, without `from` |
+| `GET /flint/v1/msg?to=address&limit=N[&ts=&sig=]` | messages `id/to/payload/created_at/expires_at`, without `from`; hardened relays additionally require the address's fetch proof |
 | `POST /flint/v1/msg/<uuid>/ack` | `{to,id,ts,signature}`; recipient signature, otherwise 401/404 |
 | `GET /flint/v1/health` | `{ok:true}` |
 
 Rules:
 
-- `id` is a UUID; path traversal is rejected;
+- `id` is a UUID; path traversal is rejected. Ids are canonicalized
+  (lowercase, hyphenated) before store/ACK, so different letter case cannot
+  address two entries on any filesystem;
 - the ACK transcript binds `to/id/ts`; the time window is ±300 s; knowing an
   address does not grant the right to delete someone else's message;
+- hardened relays require a **fetch proof** on `GET`: the address holder signs
+  `flint-gateway-fetch-v1 || 0 || address || 0 || ts` (ed25519, ts ±300 s).
+  Without it an address's message count/size/time/id metadata is not returned.
+  `flint-relay` enables this by default (`--allow-unsigned-fetch` is a legacy/dev
+  escape hatch); in-repo clients sign automatically via
+  `Transport::fetch_signed`, the legacy unsigned path works only with a local
+  gateway that does not require it;
 - relay/onion listeners require a signed ACK; an unsigned "legacy" ACK is
   accepted only by a local test gateway
   (`GatewayConfig.require_signed_ack = false`);
 - relay defaults: up to 100 messages per recipient, payload ≤ 64 KiB, 10000 in
   total; `flint-relay` additionally enables `require_pow` and
-  `require_signed_ack`;
+  `require_signed_ack`; post-rate limits are per source IP/recipient;
+- direct-mode gateways disable the shared loopback post-rate limit (all Tor
+  senders appear as 127.0.0.1) and use a larger queue (500/recipient, 5000
+  total) + PoW + the recipient's poll/ACK drain instead. This removes the cheap
+  "fill the shared bucket" block; a sustained flood can still delay delivery
+  (see `docs/SECURITY.md`);
 - responses are bounded before reading/allocating; quotas account for the
   persisted store after restart; overfilling one recipient does not consume
   another recipient's quota; a storage failure never reports false success;
 - logs contain no message texts or secrets;
-- server and client need reasonably synchronized clocks (for ACK).
+- server and client need reasonably synchronized clocks (for ACK and fetch
+  proofs).
 
 ## 6. Transports
 
@@ -199,10 +214,23 @@ them (v1 CLI prints messages to stdout and keeps no persistent history):
   distributed abuse control are outside v1.
 - The relay can delay/delete/duplicate messages and correlate recipient, size and
   time; it cannot read the payload or forge a verifiable signature.
+- **Sender is not hidden from an envelope observer in v1.** The outer ed25519
+  sender signature lets a relay/observer test a *known candidate address* against
+  the public transcript; a positive result confirms that person messaged the
+  recipient at that time. Relay mode therefore gives confidentiality, not sender
+  anonymity. Direct mode (no third-party relay) avoids that observer; a v2
+  envelope with sender authentication inside the encrypted payload is future
+  work. See `docs/SECURITY.md`.
 - Direct connections expose the transport-level Tor guard path, not application
   metadata; Tor does not hide all metadata.
 - One onion per chat identity; the wallet payment onion is not used and is not
-  mixed with the chat in this project.
+  mixed with the chat in this project. Do not reuse the wallet's address-key seed
+  for the messenger: publishing the slatepack address then links it to the
+  messenger onion's online times. Derive a dedicated messaging seed instead
+  (`derive_messaging_seed`); see `docs/WALLET_INTEGRATION.md`.
+- Direct-mode inbound capacity is finite (queue + PoW + drain loop); a sustained
+  flood can delay legitimate delivery. There is no sender-authenticated quota in
+  v1 (`docs/SECURITY.md`).
 - Application logging must not contain plaintext/seed/keys; the CLI prints only
   addresses, onion names, ids and the messages themselves (stdout is user
   output).
@@ -217,3 +245,9 @@ PoW, ACK) were carried over into unit tests. Local formats (CLI identity file,
 store) may differ from Flint and are not part of it. The payment Slatepack
 scenarios of the original Flint (automatic handoff to a wallet) are not included:
 `MessageKind::Slatepack` is carried as opaque armor without wallet checks.
+
+Security hardening additions in this repository (not part of the original Flint
+API): signed mailbox fetch proofs (hardened relays return `401` to legacy
+unsigned clients), canonical UUID handling, and direct-mode queue limits. They
+change no envelope bytes; mixes of old/new clients are fine for send/open, but a
+legacy client cannot fetch from a relay that requires fetch proofs.

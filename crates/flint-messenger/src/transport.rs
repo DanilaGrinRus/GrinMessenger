@@ -21,7 +21,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::ack::AckProof;
-use crate::address::Address;
+use crate::address::{fetch_proof_transcript, Address};
 use crate::envelope::{unix_now, Envelope, Identity};
 use crate::error::{Error, Result};
 use crate::store::Transport;
@@ -390,8 +390,55 @@ impl Transport for GatewayTransport {
         let page = limit.max(1).min(100);
         let (status, response) =
             self.request("GET", &format!("/flint/v1/msg?to={to}&limit={page}"), b"")?;
-        self.expect_ok(status, &response)?;
-        let value: Value = serde_json::from_slice(&response)
+        self.parse_fetch(recipient, now, limit, status, &response)
+    }
+
+    /// Authenticated fetch: signs the address + timestamp so a hardened relay
+    /// only returns the mailbox metadata to the address holder.
+    fn fetch_signed(&self, recipient: &Identity, now: u64, limit: usize) -> Result<Vec<Envelope>> {
+        let address = recipient.address();
+        let to = address.to_string();
+        let page = limit.max(1).min(100);
+        let signature = recipient.sign_bytes(&fetch_proof_transcript(address, now));
+        let sig = data_encoding::HEXLOWER.encode(&signature);
+        let (status, response) = self.request(
+            "GET",
+            &format!("/flint/v1/msg?to={to}&limit={page}&ts={now}&sig={sig}"),
+            b"",
+        )?;
+        self.parse_fetch(address, now, limit, status, &response)
+    }
+
+    fn ack(&self, recipient: &Address, ids: &[String]) -> Result<usize> {
+        let to = recipient.to_string();
+        let body = serde_json::to_vec(&serde_json::json!({ "to": to }))
+            .map_err(|e| Error::Store(format!("json: {e}")))?;
+        self.ack_with_body(&body, ids)
+    }
+
+    fn ack_signed(&self, recipient: &Identity, ids: &[String]) -> Result<usize> {
+        let mut acked = 0;
+        for id in ids {
+            let proof = AckProof::sign(recipient, id, unix_now());
+            let body =
+                serde_json::to_vec(&proof).map_err(|e| Error::Store(format!("ack proof: {e}")))?;
+            acked += self.ack_one(id, &body)?;
+        }
+        Ok(acked)
+    }
+}
+
+impl GatewayTransport {
+    fn parse_fetch(
+        &self,
+        recipient: &Address,
+        now: u64,
+        limit: usize,
+        status: u16,
+        response: &[u8],
+    ) -> Result<Vec<Envelope>> {
+        self.expect_ok(status, response)?;
+        let value: Value = serde_json::from_slice(response)
             .map_err(|e| Error::Store(format!("gateway JSON: {e}")))?;
         let items = value
             .get("messages")
@@ -438,26 +485,6 @@ impl Transport for GatewayTransport {
         Ok(out)
     }
 
-    fn ack(&self, recipient: &Address, ids: &[String]) -> Result<usize> {
-        let to = recipient.to_string();
-        let body = serde_json::to_vec(&serde_json::json!({ "to": to }))
-            .map_err(|e| Error::Store(format!("json: {e}")))?;
-        self.ack_with_body(&body, ids)
-    }
-
-    fn ack_signed(&self, recipient: &Identity, ids: &[String]) -> Result<usize> {
-        let mut acked = 0;
-        for id in ids {
-            let proof = AckProof::sign(recipient, id, unix_now());
-            let body =
-                serde_json::to_vec(&proof).map_err(|e| Error::Store(format!("ack proof: {e}")))?;
-            acked += self.ack_one(id, &body)?;
-        }
-        Ok(acked)
-    }
-}
-
-impl GatewayTransport {
     fn ack_with_body(&self, body: &[u8], ids: &[String]) -> Result<usize> {
         let mut acked = 0;
         for id in ids {

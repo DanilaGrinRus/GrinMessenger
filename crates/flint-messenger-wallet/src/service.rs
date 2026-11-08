@@ -861,10 +861,14 @@ impl WalletService {
                     require_signed_ack: true,
                     require_pow: true,
                     ttl_secs: self.config.ttl_secs,
-                    max_per_recipient: 30,
-                    max_total: 1_000,
+                    max_per_recipient: 500,
+                    max_total: 5_000,
                     max_payload: MAX_ARMOR_BYTES,
                     max_posts_per_minute: 30,
+                    // Tor forwards every sender from 127.0.0.1; a shared rate
+                    // bucket lets one cheap attacker block all peers. Use the
+                    // larger queue + PoW + the poll/ack drain loop instead.
+                    enforce_post_rate: false,
                     ..GatewayConfig::default()
                 })
                 .map_err(|e| format!("gateway: {e}"))?;

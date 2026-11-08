@@ -24,3 +24,7 @@ chacha20poly1305 = "0.9"
 [[bin]]
 name = "flintmsg-walletd"
 path = "src/main.rs"
+
+[[bin]]
+name = "flintmsg-wallet-ui"
+path = "src/bin/wallet_ui.rs"

@@ -75,6 +75,31 @@ impl Address {
     pub fn onion_url(&self) -> String {
         format!("http://{}.onion", self.onion())
     }
+
+    /// Verify an ed25519 signature made by the address key. Used by relay
+    /// fetch-proofs: only the holder of the address seed can list its mailbox.
+    pub fn verify_bytes(&self, message: &[u8], signature: &[u8; 64]) -> bool {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+        let Ok(key) = VerifyingKey::from_bytes(&self.key) else {
+            return false;
+        };
+        let signature = Signature::from_bytes(signature);
+        key.verify(message, &signature).is_ok()
+    }
+}
+
+/// Transcript signed by the recipient to authenticate a relay fetch request.
+/// The relay must not accept `GET /flint/v1/msg` for an address without this
+/// proof, otherwise anyone who learns an address can read its metadata (count,
+/// sizes, timestamps, ids) and enumerate traffic.
+pub fn fetch_proof_transcript(address: &Address, timestamp: u64) -> Vec<u8> {
+    let mut out = Vec::with_capacity(64);
+    out.extend_from_slice(b"flint-gateway-fetch-v1");
+    out.push(0);
+    out.extend_from_slice(address.to_string().as_bytes());
+    out.push(0);
+    out.extend_from_slice(timestamp.to_string().as_bytes());
+    out
 }
 
 impl fmt::Display for Address {

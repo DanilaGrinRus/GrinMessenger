@@ -1,0 +1,14 @@
+=== GrinMessenger wallet console demo (flintmsg-wallet-ui over walletd API) ===
+started: 2026-11-08T08:33:42.8406376+07:00
+--- relay ---
+flint-relay listening on http://127.0.0.1:18083
+--- daemons ready ---
+alice: tgrin1sa6uecr34wfsmcljgtvcd80uqwm2ry7y38ldeh68jfwg6ykh8enq0wjgdn
+bob:   tgrin16u0mekmnx0gllrdk9p8dqdhwuguhxqnd6csspkar0racgypnrn7q2xjsm3
+--- wallet console ---
+console URL: http://127.0.0.1:50011/
+walletd API: http://127.0.0.1:49966 (bearer token injected server-side, never in the browser)
+screenshot: docs/assets/wallet-ui.png (178396 bytes)
+console page title/header: GrinMessenger Wallet Console
+demo complete: contacts, text and encrypted Slatepack visible in the console
+finished: 2026-11-08T08:33:49.0242321+07:00

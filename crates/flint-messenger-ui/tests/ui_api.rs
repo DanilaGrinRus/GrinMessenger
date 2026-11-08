@@ -37,13 +37,41 @@ fn unique_dir(name: &str) -> PathBuf {
     dir
 }
 
+/// Fixed session token passed to the UI process through `FLINTMSG_UI_TOKEN`.
+const TOKEN: &str = "test-session-token-0123456789abcdef0123456789";
+
 fn http(port: u16, method: &str, path: &str, body: &str) -> (u16, String) {
+    http_with(
+        port,
+        method,
+        path,
+        body,
+        &[
+            ("Host", format!("127.0.0.1:{port}")),
+            ("Content-Type", "application/json".to_string()),
+            ("X-Flint-UI-Token", TOKEN.to_string()),
+        ],
+    )
+}
+
+/// Raw request with explicit headers (no implicit Host/token/content type).
+fn http_with(
+    port: u16,
+    method: &str,
+    path: &str,
+    body: &str,
+    headers: &[(&str, String)],
+) -> (u16, String) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect ui");
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))
         .expect("timeout");
+    let mut head = String::new();
+    for (name, value) in headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{method} {path} HTTP/1.1\r\n{head}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
     stream.write_all(request.as_bytes()).expect("write request");
@@ -92,7 +120,7 @@ fn try_json_state(port: u16) -> Option<Value> {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
     let request =
-        format!("GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+        format!("GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Flint-UI-Token: {TOKEN}\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).ok()?;
     stream.flush().ok();
     let mut raw = Vec::new();
@@ -136,6 +164,7 @@ fn spawn_ui(port: u16, data_dir: &PathBuf, relay_url: &str) -> UiProcess {
             "--poll-secs",
             "1",
         ])
+        .env("FLINTMSG_UI_TOKEN", TOKEN)
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
@@ -330,5 +359,149 @@ fn invalid_requests_are_rejected() {
     let (status, _) = http(port, "GET", "/index.html", "");
     assert_eq!(status, 200);
 
+    std::fs::remove_dir_all(&data_dir).ok();
+}
+
+#[test]
+fn api_is_guarded_against_cross_site_and_rebinding() {
+    let gateway = relay();
+    let data_dir = unique_dir("guard");
+    let port = free_port();
+    let _ui = spawn_ui(port, &data_dir, &gateway.url());
+    let _ = wait_ui_ready(port, Duration::from_secs(20));
+    let host = format!("127.0.0.1:{port}");
+    let send = "{\"to\":\"nope\",\"text\":\"x\"}";
+
+    // Liveness stays open, the page is static and carries no token.
+    let (status, _) = http_with(port, "GET", "/api/health", "", &[("Host", host.clone())]);
+    assert_eq!(status, 200);
+    let (status, page) = http_with(port, "GET", "/", "", &[("Host", host.clone())]);
+    assert_eq!(status, 200);
+    assert!(
+        !page.contains(TOKEN),
+        "the page must not embed the session token"
+    );
+
+    // No token / wrong token.
+    let (status, body) = http_with(port, "GET", "/api/state", "", &[("Host", host.clone())]);
+    assert_eq!(status, 401, "state without token: {body}");
+    assert!(
+        !body.contains("tgrin1"),
+        "nothing leaks without a token: {body}"
+    );
+    let (status, _) = http_with(
+        port,
+        "GET",
+        "/api/export",
+        "",
+        &[
+            ("Host", host.clone()),
+            ("X-Flint-UI-Token", "x".repeat(TOKEN.len())),
+        ],
+    );
+    assert_eq!(status, 401, "wrong token must be rejected");
+
+    // DNS rebinding: valid token but a foreign Host.
+    let (status, _) = http_with(
+        port,
+        "GET",
+        "/api/state",
+        "",
+        &[
+            ("Host", format!("evil.example:{port}")),
+            ("X-Flint-UI-Token", TOKEN.to_string()),
+        ],
+    );
+    assert_eq!(status, 403, "foreign Host must be rejected");
+    let (status, _) = http_with(port, "GET", "/", "", &[]);
+    assert_eq!(status, 403, "missing Host must be rejected");
+
+    // Cross-site: a foreign Origin is rejected even with the token.
+    let (status, _) = http_with(
+        port,
+        "POST",
+        "/api/send",
+        send,
+        &[
+            ("Host", host.clone()),
+            ("Origin", "http://evil.example".to_string()),
+            ("Content-Type", "application/json".to_string()),
+            ("X-Flint-UI-Token", TOKEN.to_string()),
+        ],
+    );
+    assert_eq!(status, 403, "foreign Origin must be rejected");
+
+    // CORS-simple text/plain POST is refused before any JSON parsing.
+    let (status, _) = http_with(
+        port,
+        "POST",
+        "/api/send",
+        send,
+        &[
+            ("Host", host.clone()),
+            ("Content-Type", "text/plain".to_string()),
+            ("X-Flint-UI-Token", TOKEN.to_string()),
+        ],
+    );
+    assert_eq!(status, 415, "text/plain body must be rejected");
+
+    // The same request with the right Origin, token and JSON reaches the route
+    // (and fails there only because the address is invalid).
+    let (status, body) = http_with(
+        port,
+        "POST",
+        "/api/send",
+        send,
+        &[
+            ("Host", format!("localhost:{port}")),
+            ("Origin", format!("http://localhost:{port}")),
+            (
+                "Content-Type",
+                "application/json; charset=utf-8".to_string(),
+            ),
+            ("X-Flint-UI-Token", TOKEN.to_string()),
+        ],
+    );
+    assert_eq!(status, 400, "valid request must reach the handler: {body}");
+
+    std::fs::remove_dir_all(&data_dir).ok();
+}
+
+#[test]
+fn non_loopback_listen_is_refused() {
+    let data_dir = unique_dir("bind");
+    let output = Command::new(env!("CARGO_BIN_EXE_flintmsg-ui"))
+        .args([
+            "--data",
+            data_dir.to_str().expect("data path"),
+            "--listen",
+            "0.0.0.0:0",
+            "--relay",
+            "http://127.0.0.1:9",
+            "--plain",
+        ])
+        .env("FLINTMSG_UI_TOKEN", TOKEN)
+        .output()
+        .expect("run flintmsg-ui");
+    assert!(!output.status.success(), "0.0.0.0 must be refused");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("non-loopback"), "stderr: {stderr}");
+    std::fs::remove_dir_all(&data_dir).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn identity_file_is_owner_only() {
+    use std::os::unix::fs::PermissionsExt;
+    let gateway = relay();
+    let data_dir = unique_dir("perm");
+    let port = free_port();
+    let _ui = spawn_ui(port, &data_dir, &gateway.url());
+    let _ = wait_ui_ready(port, Duration::from_secs(20));
+    let mode = std::fs::metadata(data_dir.join("identity.json"))
+        .expect("identity.json")
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o077, 0, "identity.json mode {mode:o}");
     std::fs::remove_dir_all(&data_dir).ok();
 }

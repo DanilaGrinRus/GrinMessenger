@@ -317,8 +317,34 @@ function copyFrom(id) {
   }
 }
 
+// Session token: flintmsg-ui prints UI_URL=http://127.0.0.1:PORT/#token=...
+// The fragment never reaches the server; keep it for this tab and strip it
+// from the address bar so it does not linger in history or screenshots.
+const SESSION_TOKEN = (() => {
+  let token = "";
+  const match = /(?:^|[#&])token=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  if (match) {
+    token = match[1];
+    try { sessionStorage.setItem("flintmsg-ui-token", token); } catch (error) { /* storage off */ }
+    try { window.history.replaceState(null, "", location.pathname + location.search); } catch (error) { /* ignore */ }
+  } else {
+    try { token = sessionStorage.getItem("flintmsg-ui-token") || ""; } catch (error) { token = ""; }
+  }
+  return token;
+})();
+
+function withToken(options) {
+  const opts = Object.assign({}, options || {});
+  opts.headers = Object.assign({}, opts.headers || {}, { "X-Flint-UI-Token": SESSION_TOKEN });
+  opts.cache = "no-store";
+  return opts;
+}
+
 async function api(path, options) {
-  const response = await fetch(path, options);
+  if (!SESSION_TOKEN) {
+    throw new Error("no session token: open the full UI_URL printed by flintmsg-ui");
+  }
+  const response = await fetch(path, withToken(options));
   let data = null;
   try { data = await response.json(); } catch (error) { data = null; }
   if (!response.ok) {
@@ -600,8 +626,11 @@ async function removeContact(address) {
 }
 
 function exportTranscript() {
-  fetch("/api/export")
-    .then((response) => response.json())
+  fetch("/api/export", withToken())
+    .then((response) => {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    })
     .then((data) => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);

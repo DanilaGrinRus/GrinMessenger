@@ -19,11 +19,14 @@ fn usage() -> &'static str {
   --ttl <seconds>       maximum message lifetime (default 93600)
   --max-per <n>         messages per recipient (default 100)
   --max-total <n>       messages on this relay (default 10000)
+  --allow-unsigned-fetch
+                        legacy/dev only: disable signed mailbox fetch proofs
   --help
 
 Messages are opaque signed+encrypted envelopes. The relay cannot decrypt the
-payload or the sender address. Recipient acks must be signed and envelopes must
-carry a valid proof of work."
+payload or the sender address. Recipient acks must be signed, envelopes must
+carry a valid proof of work, and mailbox reads require a signed fetch proof from
+the address key (otherwise anyone knowing an address could enumerate metadata)."
 }
 
 fn main() {
@@ -32,6 +35,7 @@ fn main() {
     let mut ttl = 26 * 60 * 60u64;
     let mut max_per = 100usize;
     let mut max_total = 10_000usize;
+    let mut require_fetch_proof = true;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -53,6 +57,7 @@ fn main() {
                     .parse()
                     .unwrap_or_else(|_| fatal("--max-total: число"))
             }
+            "--allow-unsigned-fetch" => require_fetch_proof = false,
             "--help" | "-h" => {
                 println!("{}", usage());
                 return;
@@ -70,6 +75,7 @@ fn main() {
         bind,
         require_signed_ack: true,
         require_pow: true,
+        require_fetch_proof,
         store_dir: Some(store.clone()),
         ttl_secs: ttl,
         max_per_recipient: max_per,
@@ -85,6 +91,11 @@ fn main() {
     println!("store: {}", store.display());
     println!("ttl: {ttl}s, per-recipient: {max_per}, total: {max_total}");
     println!("signed acks: required, proof of work: required");
+    if require_fetch_proof {
+        println!("mailbox fetch: signed address proof required");
+    } else {
+        println!("WARNING: mailbox fetch proofs disabled (--allow-unsigned-fetch)");
+    }
     println!("Publish this listener through Tor; do not expose it as plain HTTP.");
 
     loop {

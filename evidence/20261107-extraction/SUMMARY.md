@@ -48,6 +48,33 @@ binds, and the daemon takes the seed from a file/env/identity file (or generates
 one explicitly). Contract: [docs/WALLET_INTEGRATION.md](../../docs/WALLET_INTEGRATION.md).
 Evidence: [26-wallet-tests.log](26-wallet-tests.log), [27-wallet-demo.log](27-wallet-demo.log).
 
+## Security hardening (2026-11-08)
+
+Audit findings and residual risks are tracked in
+[docs/SECURITY.md](../../docs/SECURITY.md). Fixed in this release:
+
+- **UI CSRF / DNS rebinding**: per-start session token printed only in the URL
+  fragment, required in `X-Flint-UI-Token`; exact loopback `Host` allowlist;
+  same-origin `Origin`; JSON POST only; loopback bind enforced.
+- **Relay mailbox metadata**: `GET /flint/v1/msg` now requires a signed
+  address+timestamp fetch proof; `flint-relay` enables it by default, clients
+  sign automatically (`Transport::fetch_signed`).
+- **UUID case handling**: ids are canonicalized (lowercase hyphenated) for
+  store/ACK/list; mixed-case requests cannot create or address a second entry.
+- **Direct-mode inbound DoS**: the shared loopback post-rate limit (all Tor
+  senders appear as 127.0.0.1) is disabled for direct gateways; larger queue
+  (500/recipient, 5000 total) + PoW + poll/ACK drain replace it.
+- **Secret files**: wallet tokens/identity are written owner-only on Unix
+  (created `0600` before the secret) and ACL-hardened on Windows; CLI identity
+  files are `0600`; UI data files are owner-only.
+- **Wallet console**: loopback `Host`/`Origin`/JSON guard and server-side token
+  injection (the browser never sees the bearer token).
+
+Residual v1 limitations (documented, not silently claimed away): envelope v1's
+outer sender signature lets a relay test a known candidate sender; reusing the
+wallet address-key seed links messenger/onion to the payment address; a sustained
+direct-mode flood can still delay delivery (no per-sender authenticated quota).
+
 ## Live Tor fix (2026-11-08)
 
 The first live run exposed a real wire bug: hyper emitted absolute-form request
@@ -63,13 +90,14 @@ fix delivered a direct onion message end to end.
 | Check | Result |
 |---|---|
 | Offline build (`cargo build --workspace --offline --locked`) | **PASS** (exit 0) |
-| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 142 passed, 0 failed, 2 ignored |
+| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 154 passed, 0 failed, 2 ignored |
 | `cargo fmt --check` | **PASS** |
-| Ignored `relay_live` test (spawns the real `flint-relay` process) | **PASS**, 1 passed |
-| Web-UI integration tests (real relay + real `flintmsg-ui` process) | **PASS**, 2 passed |
+| Ignored `relay_live` test (spawns the real hardened `flint-relay` process) | **PASS**, 1 passed |
+| Web-UI integration tests (real relay + real `flintmsg-ui` process, browser guard) | **PASS**, 4 passed |
 | Web-UI demo (relay loopback, CLI peer ↔ browser, screenshot) | **PASS**: delivery both ways, signed ACK, contact + transcript export |
-| Wallet integration tests (two real `flintmsg-walletd` processes + real relay) | **PASS**, 3 integration + 11 unit tests: text and encrypted Slatepack delivery, contacts, unread/read, event cursors, bearer auth, validation |
-| Wallet sidecar demo (API transcript, relay loopback) | **PASS**: capabilities/identity, contacts, text + Slatepack delivery, events, unread/read — [27-wallet-demo.log](27-wallet-demo.log) |
+| Wallet integration tests (two real `flintmsg-walletd` processes + real relay) | **PASS**, 3 integration + 12 unit tests: text and encrypted Slatepack delivery, contacts, unread/read, event cursors, bearer auth, validation |
+| Wallet web console tests (page/proxy/token non-exposure/DNS-rebinding guard) | **PASS**, 3 integration + 2 unit tests; [28-wallet-ui-demo.log](28-wallet-ui-demo.log) |
+| Security hardening tests (signed fetch proof, canonical UUIDs, direct-mode burst, private files, UI/console guard) | **PASS**, covered by the workspace suite and the real relay process; [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
 | **Live Tor** (cross-process direct onion on a GCP VM) | **PASS** (2026-11-08): Arti bootstrapped 100%, `flintmsg serve` published an onion, `flintmsg send` delivered a direct onion envelope, the receiver opened it and sent a signed ACK; log [25-live-tor-gcp.log](25-live-tor-gcp.log). The local build sandbox has no Tor egress. |
 | Two-process loopback E2E (`flint-relay` + `flintmsg keygen/send/fetch`) | **PASS**: delivery, open, signed ACK, empty re-fetch, offline send fails |
 | Independent verification (separate agent, own build dir) | **PASS**, no P0–P2 defects; 9 findings fixed and re-checked |
@@ -81,7 +109,7 @@ Nostr test (needs an external relay).
 ## Freeze manifest
 
 The delivered source tree is pinned by
-[source-sha256.sha256](source-sha256.sha256) (68 files: crates, Cargo manifests,
+[source-sha256.sha256](source-sha256.sha256) (74 files: crates, Cargo manifests,
 docs, site, screenshot, GitHub workflow, README, licenses, notices; `evidence/`
 is intentionally excluded). Its SHA-256 is stored in
 [source-sha256.sha256.hash](source-sha256.sha256.hash).
@@ -92,10 +120,14 @@ is intentionally excluded). Its SHA-256 is stored in
 - The local build sandbox has no Tor egress; live Tor was therefore verified on
   a GCP VM (two-process direct onion, see above). Direct-mode UI/CLI against a
   real onion is covered by that CLI run, not by a live UI run.
-- The web UI has no authentication; it is loopback-only by design.
+- The web UI uses a per-start session token + Host/Origin guard; it is still a
+  single-user local tool and must not be exposed.
 - Wallet integration transports wallet-provided Slatepack armor only: no wallet
   RPC, no automatic transaction processing, one identity per daemon, no iOS/FFI
   build in this version.
+- Envelope v1 sender anonymity against a relay is not provided (public outer
+  signature); address-key reuse for the messenger is discouraged (online-time
+  linkability); direct mode can still be flooded (queue is finite).
 - No forward secrecy, no groups/attachments, no offline guarantee.
 - Not audited; DEV/testnet tool; no mainnet readiness claim.
 - Extraction evidence and reports are in Russian (historical artifacts).

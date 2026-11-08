@@ -1,0 +1,37 @@
+=== GrinMessenger security hardening demo (2026-11-08) ===
+started: 2026-11-08T08:40:25.4954683+07:00
+--- relay startup (signed fetch proof is on by default) ---
+flint-relay listening on http://127.0.0.1:18084
+store: C:\DHW\GrinMessageModule\.tmp-security-demo\relay-store
+ttl: 93600s, per-recipient: 100, total: 10000
+signed acks: required, proof of work: required
+mailbox fetch: signed address proof required
+Publish this listener through Tor; do not expose it as plain HTTP.
+
+bob address: tgrin1saaurzuvz76k5jncp005xht64qpwfdjs8qgf0lrxqd06nvk5dupqlnysjh
+signed transport send: OK
+
+--- GM-2: anonymous mailbox fetch is rejected by the real relay ---
+unsigned GET /flint/v1/msg: HTTP/1.1 401 Unauthorized
+forged fetch proof:          HTTP/1.1 401 Unauthorized
+signed client fetch:         {"created_at":1794102026,"event":"message","from":"tgrin1pk7jpyksc2pgh4wz8wgwyh7l6uddea6ydzhxek6zqhk7dw3lpcsqdjpkwg","id":"dcedcbcc-1b49-4fff-9d3d-b521ac8d4f84","kind":"text","text":"security demo message"} {"count":1,"event":"acked"} {"event":"fetched","opened":1,"source":"http://127.0.0.1:18084"}
+
+--- GM-1: flintmsg-ui Host / Origin / token guard ---
+UI_URL: UI_URL=http://127.0.0.1:18123/#token=security-demo-session-token-0123456789abcdef
+GET /api/state, Host evil.example:      HTTP/1.1 403 Forbidden  (DNS rebinding)
+GET /api/state, no token:               HTTP/1.1 401 Unauthorized
+GET /api/state, valid token:            HTTP/1.1 200 OK
+POST /api/send, Origin evil.example:    HTTP/1.1 403 Forbidden  (CSRF)
+POST /api/send, text/plain body:        HTTP/1.1 415 Unsupported Media Type
+
+--- GM-4: wallet secret files are ACL-restricted before writing ---
+identity subcommand: {   "address": "tgrin1h0va4u76fctrpq44qmexgtdk8ke6upsrejlk2t2vk9ryyeg9mcyq89qfhe",   "network": "tgrin",   "onion": "xpm5v462jyldbavva3zgilnwhwz24bqdzs7wklkmwfdeezif3yeal2ad",   "onion_url": "http://xpm5v462jyldbavva3zgilnwhwz24bqdzs7wklkmwfdeezif3yeal2ad.onion",   "warning": "the seed is intentionally not printed" }
+icacls identity.json:
+C:\DHW\GrinMessageModule\.tmp-security-demo\wallet-data\identity.json NT AUTHORITY\�������:(F)
+                                                                      DPC1\nurli:(F)
+                                                                      ��易⥫쭠� ��⪠\������ ��易⥫�� �஢���:(I)(NW)
+
+Successfully processed 1 files; Failed processing 0 files
+
+=== security demo complete: relay fetch proof, UI Host/Origin/token, wallet ACL ===
+finished: 2026-11-08T08:40:27.0233850+07:00

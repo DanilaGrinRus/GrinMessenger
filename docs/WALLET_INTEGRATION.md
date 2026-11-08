@@ -24,6 +24,7 @@ already-encrypted armor between the two wallets.
 | `flint-gateway` (`flint-relay`) | optional store-and-forward relay; sees only opaque envelopes |
 | `flint-messenger-wallet` | **integration layer**: wallet-facing service, seed derivation, encrypted local history/contacts/read markers |
 | `flintmsg-walletd` | loopback sidecar JSON API for non-Rust wallets |
+| `flintmsg-wallet-ui` | optional loopback web console over the sidecar API (same-origin token proxy, Host/Origin guard) |
 | `flintmsg`, `flintmsg-ui` | CLI and browser UI for demos/debugging |
 
 Two transports are available per identity:
@@ -69,13 +70,16 @@ Rules:
   show both in the UI ("payment address" vs "messenger address") or use the
   messenger address for chat/Slatepack transport.
 
-### B. Reuse the wallet address key
+### B. Reuse the wallet address key — NOT recommended
 
-If the wallet can export the 32-byte seed of its *address* key (not the spending
-key), pass that seed. The messenger address then equals the wallet's slatepack
-address. This is convenient for user recognition but reuses one ed25519 key for
-two purposes (wallet address signatures and envelope signatures). Both uses are
-domain-separated in this protocol, but a dedicated subkey (option A) is safer.
+It is technically possible to export the 32-byte seed of the wallet's *address*
+key and pass it as the messaging seed; the messenger address then equals the
+wallet's slatepack address. **Do not do this by default.** The messenger onion is
+derived from the same key, so anyone who knows the published slatepack address
+can observe when that onion is online and correlate payment and messaging
+activity. It also reuses one ed25519 key for two purposes. Use option A unless
+the user explicitly accepts permanent linkability between the payment address and
+the messenger identity; see `docs/SECURITY.md` §8.
 
 ### C. Standalone/generated seed (tests, standalone chat)
 
@@ -95,6 +99,30 @@ The seed is never printed and is not written by the daemon (except when the
 caller explicitly uses `--generate`/`--identity`). Use
 `flintmsg-walletd identity --seed-file … --network tgrin` to print only the
 derived address/onion before starting the service.
+
+### 3.1 Optional web console
+
+`flintmsg-wallet-ui` is a separate loopback process for wallet developers: it
+serves a chat/contacts/inspector page and proxies `/api/v1/*` to the daemon,
+injecting the daemon bearer token server-side. The token never appears in the
+browser page or in the console URL; the console enforces an exact loopback
+`Host` allowlist, same-origin `Origin`, and JSON POST bodies (DNS
+rebinding/CSRF guard).
+
+```powershell
+target\debug\flintmsg-wallet-ui.exe `
+  --api http://127.0.0.1:50642 `
+  --token-file wallet-data\messenger\api-token `
+  --listen 127.0.0.1:0
+# prints {"event":"ready","url":"http://127.0.0.1:PORT/",...}
+```
+
+The page shows the wallet daemon phase/mode/address/unread state, contacts,
+text and opaque Slatepack messages with copy buttons, and lets the operator send
+text or paste Slatepack armor. It is a developer/demo console; a wallet
+application should draw its own UI over the API. Screenshot:
+[docs/assets/wallet-ui.png](assets/wallet-ui.png). See
+`docs/SECURITY.md` §5 for the browser guard details.
 
 ---
 
@@ -296,7 +324,10 @@ on `wait_ready`.
   wallet process.
 - Token file: delete it to rotate the token; the daemon creates a new one on the
   next start. With `--token-file` the wallet can provision its own token first
-  (min 32 chars).
+  (min 32 chars). The daemon writes/opens token and generated-identity files with
+  owner-only permissions *before* the secret bytes are written: `0600` on Unix,
+  and on Windows it removes inherited ACEs and grants only the current account
+  (plus SYSTEM) via `icacls`, failing closed if hardening fails.
 
 ---
 
@@ -314,6 +345,20 @@ on `wait_ready`.
   messenger data directory removes the local history but not copies on the peer.
 - The relay sees recipient addresses and ciphertext, can drop/delay messages, but
   cannot read or forge them. Signed ACKs let the recipient delete stored mail.
+  Hardened relays also require a **signed fetch proof** for mailbox reads; the
+  sidecar/embedded client signs automatically, so this is transparent to the
+  wallet. Without it an address holder would expose message count/size/time/id
+  to anyone who learns the address.
+- Sender anonymity against a relay is a v1 limitation: the outer envelope
+  signature lets a relay test a known candidate address. Relay mode gives
+  confidentiality, not sender anonymity; use direct mode when that matters.
+  Details and the v2 plan: `docs/SECURITY.md` §7.
+- Direct-mode inbound capacity is finite: the local gateway queue + PoW + poll/ACK
+  drain replaces the old shared loopback rate limit (which was a cheap inbound
+  DoS), but a sustained flood can still delay delivery. See `docs/SECURITY.md` §6.
+- Never export the wallet address-key seed as the messaging seed unless the user
+  accepts address/messaging linkability; derive a dedicated seed instead
+  (`docs/SECURITY.md` §8).
 - The messenger is **not audited**; use on DEV/testnet first. Mainnet use is at
   the caller's risk.
 - One identity per service/daemon. Multi-account wallets can run one service per
@@ -379,8 +424,11 @@ cargo test -p flint-messenger-wallet
 ```
 
 Covers: seed derivation/domain separation, identity file roundtrip, encrypted read
-markers, capabilities/bind policy, two real daemons exchanging text and encrypted
-Slatepack through a real relay, unread/read markers, event cursors, bearer-token
-auth and request validation. See
-[`crates/flint-messenger-wallet/tests/wallet_api.rs`](../crates/flint-messenger-wallet/tests/wallet_api.rs)
-and evidence logs `26-wallet-tests.log` / `27-wallet-demo.log`.
+markers, owner-only secret files, capabilities/bind policy, two real daemons
+exchanging text and encrypted Slatepack through a real relay, unread/read markers,
+event cursors, bearer-token auth and request validation, plus the wallet web
+console (page serving, proxy, token non-exposure, DNS-rebinding/CSRF guard).
+See [`crates/flint-messenger-wallet/tests/wallet_api.rs`](../crates/flint-messenger-wallet/tests/wallet_api.rs),
+[`wallet_ui.rs`](../crates/flint-messenger-wallet/tests/wallet_ui.rs) and
+evidence logs `26-wallet-tests.log` / `27-wallet-demo.log` /
+`28-wallet-ui-demo.log` / `29-security-tests.log` / `30-security-demo.log`.

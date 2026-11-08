@@ -61,11 +61,16 @@ Bob   flintmsg fetch --relay http://<relay>/  ◄──  mailbox files/TTL/quota
 ```
 
 - `flint-relay` — `flint-gateway` with `require_signed_ack = true`,
-  `require_pow = true`; messages are opaque envelopes.
+  `require_pow = true`, `require_fetch_proof = true`; messages are opaque
+  envelopes. Mailbox reads require the address key's signature over
+  address+timestamp, so knowing an address does not expose message count/size/
+  time/id metadata. `--allow-unsigned-fetch` is a legacy/dev escape hatch.
 - The relay can be published as an onion service (through Arti or external Tor)
   or run on loopback for tests (`--plain` in the CLI).
 - ACKs are signed by the recipient key (`AckProof`); nobody can delete someone
-  else's message.
+  else's message. Message ids are canonicalized (lowercase hyphenated UUID) for
+  every store/ACK operation, so letter case cannot create or address a second
+  entry.
 
 ## CLI (`flintmsg`)
 
@@ -96,11 +101,18 @@ Single-user, loopback-only front-end. The server keeps the same runtime state as
 | `GET /api/export` | transcript JSON (`grinmessenger-transcript-v1`) |
 | `GET /api/health` | liveness |
 
-The UI persists `history.json` and `contacts.json` in `--data`; incoming
-envelopes are stored before their signed ACK is sent. Transport startup (Arti
-bootstrap / onion service) runs in a background thread so the page is available
-immediately and shows `tor`/`ready`/`error` state. There is no authentication:
-the server binds loopback and must not be exposed.
+The UI persists `history.json` and `contacts.json` in `--data` as owner-only
+files (`0600` on Unix); incoming envelopes are stored before their signed ACK is
+sent. Transport startup (Arti bootstrap / onion service) runs in a background
+thread so the page is available immediately and shows `tor`/`ready`/`error`
+state.
+
+Security guard (audit GM-1): the API is not "trusted because it is loopback".
+Every start prints `UI_URL=http://127.0.0.1:PORT/#token=…`; the token is required
+in `X-Flint-UI-Token` for all `/api/*` calls except `/api/health`, the `Host`
+header must be an exact bound loopback name (defeats DNS rebinding), a present
+`Origin` must be same-origin, and POST bodies must be JSON. The page embeds no
+token and CSP forbids external resources.
 
 ## Wallet integration (`flint-messenger-wallet` / `flintmsg-walletd`)
 
@@ -128,6 +140,11 @@ Key points:
   RPC endpoint.
 - The sidecar binds loopback only, requires a bearer token for every endpoint
   except `/v1/health`, and has no CORS/TLS (local process API).
+- The optional wallet web console (`flintmsg-wallet-ui`) is a separate process:
+  it serves one page and proxies `/api/v1/*` to the daemon, injecting the bearer
+  token server-side (the token never reaches the browser). It enforces the same
+  loopback `Host` allowlist, same-origin `Origin`, and JSON POST body rules as
+  `flintmsg-ui`; the daemon API itself remains the only authority.
 
 ## Trust boundaries
 
@@ -136,12 +153,18 @@ Key points:
   needed for authentication (the recipient verifies the signature after
   decryption).
 - **Relay**: sees `to`, size and time, can delete/duplicate; it does not see the
-  payload/sender and cannot forge the signature.
+  payload/sender and cannot forge the signature. In envelope v1 the outer sender
+  signature is public: a relay can test a *known candidate address* against it
+  and confirm that the candidate signed a message of that size/time. Relay mode
+  therefore does not provide sender anonymity against the relay; direct mode
+  avoids a third-party envelope observer. A v2 envelope with sender
+  authentication inside the payload is future work (`docs/SECURITY.md`).
 - **Tor/Arti**: transport confidentiality; the application does not rely on Tor
   for end-to-end encryption (the envelope provides it).
 - **CLI/UI**: the identity file is a secret; CLI stdout and the UI page may
   contain plaintext messages — that is user-facing output, not service logging.
-  The UI is loopback-only and has no authentication.
+  The UI is loopback-only and requires the per-start session token plus
+  Host/Origin checks.
 - **Wallet daemon**: the seed never leaves the process; the loopback API is
   protected by a bearer token (`0600` file on Unix); history/contacts/read markers
   are encrypted with a separate storage key. The daemon has no wallet RPC and
@@ -156,9 +179,12 @@ Key points:
 - CLI `serve` is a blocking poll loop (2 s by default). Unacknowledged envelopes
   are stored in the file-backed mailbox of the loopback gateway
   (`<data>/mailbox`); the CLI keeps no separate decrypted history.
-- Relay limits: TTL/quotas/sizes live in `GatewayConfig`; CLI `serve` uses
-  stricter P2P limits (32 KiB payload, 30 per recipient, 12 h TTL), while
-  `flint-relay` uses the relay defaults.
+- Relay limits: TTL/quotas/sizes live in `GatewayConfig`; relay mode keeps the
+  post-rate limiter, while direct-mode gateways disable it (every Tor sender is
+  127.0.0.1, so a shared bucket was a cheap inbound DoS) and use a larger queue
+  (500/recipient, 5000 total, 32 KiB payload, 12 h TTL) drained by the poll/ACK
+  loop plus PoW. A sustained direct-mode flood can still delay delivery; this is
+  documented residual risk, not claimed away.
 - The web UI is a thin shell: one OS thread per HTTP connection, one background
   poll thread, no async runtime of its own; it reuses the Arti runtime kept by
   `flint-tor-arti`.
@@ -169,7 +195,8 @@ Key points:
   explicit `Host` header, and the gateway also normalizes absolute-form targets
   (regression-tested). This matters: hyper emits absolute-form when the request
   URI carries a scheme+authority, and a minimal origin server would otherwise
-  answer 404 for every `/flint/v1/*` call.
+  answer 404 for every `/flint/v1/*` call. Mailbox fetches from clients add a
+  signed `ts`/`sig` proof; the gateway verifies it before listing metadata.
 - Wallet API limits: text 8 KiB, Slatepack armor 32 KiB, TTL 1 s–7 days,
   contact limit 500, event long-poll ≤30 s.
 

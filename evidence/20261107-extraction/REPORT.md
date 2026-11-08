@@ -30,10 +30,10 @@ RPC и платёжной интеграции **не переносился**.
 | GCP (live Tor) | Ubuntu 24.04 VM `grin-linux-build` (e2-medium, us-central1-a), Rust 1.99.1, публичный интернет; репозиторий клонирован с GitHub |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
-| Исходники | 43 `.rs`, 14 421 строк; `Cargo.lock` 556 пакетов; + один встроенный `ui.html` |
-| Бинари (build output) | `target/debug/flintmsg.exe` 26.98 МБ, `target/debug/flint-relay.exe` 3.26 МБ, `target/debug/flintmsg-ui.exe` 27.07 МБ, `target/debug/flintmsg-walletd.exe` 27.38 МБ; **в поставку не входят, пересобираются из исходников** |
+| Исходники | 45 `.rs`, 16 221 строк; `Cargo.lock` 556 пакетов; + встроенные `ui.html` / `wallet_ui.html` |
+| Бинари (build output) | `target/debug/flintmsg.exe` 26.99 МБ, `target/debug/flint-relay.exe` 3.25 МБ, `target/debug/flintmsg-ui.exe` 27.10 МБ, `target/debug/flintmsg-walletd.exe` 27.41 МБ, `target/debug/flintmsg-wallet-ui.exe` 5.23 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
-| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 68 файлов |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 74 файла |
 
 ## Проверки
 
@@ -67,14 +67,22 @@ RPC и платёжной интеграции **не переносился**.
 | 18 | Найден и исправлен wire-баг live-режима: hyper отправлял absolute-form request-target, gateway отвечал 404; фикс + регрессионный тест | **PASS**: commit `d828211` (origin-form + Host; gateway принимает absolute-form), тест `absolute_form_request_target_is_routed_correctly`; после фикса direct onion доставка работает | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
 | 19 | Интеграция с кошельками: unit-тесты (деривация seed, storage key, encrypted read markers, bind policy, capabilities) | **PASS**: 11 unit-тестов `flint-messenger-wallet` | [26-wallet-tests.log](26-wallet-tests.log) |
 | 20 | Интеграция с кошельками: два реальных `flintmsg-walletd` + реальный `flint-relay` (text, encrypted Slatepack, contacts, unread/read, events, auth, validation) + API-demo | **PASS**: 3 integration-теста; demo: capabilities/identity, contacts, доставка text и slatepack, `unread`/`read`, `events` | [26-wallet-tests.log](26-wallet-tests.log), [27-wallet-demo.log](27-wallet-demo.log) |
+| 21 | Security: UI CSRF/DNS-rebinding guard (session token + Host/Origin/JSON) | **PASS**: 4 UI integration-теста, включая `api_is_guarded_against_cross_site_and_rebinding`; demo: 403/401/415 на реальном UI | [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
+| 22 | Security: relay signed fetch proof + canonical UUID; реальный hardened `flint-relay` | **PASS**: тесты `fetch_requires_a_signed_address_proof_when_enabled`, `mixed_case_message_ids_address_the_same_relay_entry`; `relay_live` 1 passed; демо: unsigned/forged 401, signed client fetch PASS | [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
+| 23 | Security: direct-mode inbound DoS mitigation (shared loopback rate limit отключён, очередь 500/5000 + PoW + drain) | **PASS**: тест `direct_mode_queue_does_not_share_the_relay_post_rate` (60 сообщений burst + легитимное принято); residual risk в `docs/SECURITY.md` | [29-security-tests.log](29-security-tests.log) |
+| 24 | Security: owner-only secret files (wallet/CLI/UI) + wallet console guard | **PASS**: `secret_file_is_restricted_before_content_is_written`, `identity_seed_file_is_owner_only`, `console_is_guarded_against_dns_rebinding_and_csrf`, `console_refuses_unsafe_configuration`; Windows ACL подтверждён `icacls` | [28-wallet-ui-demo.log](28-wallet-ui-demo.log), [29-security-tests.log](29-security-tests.log), [30-security-demo.log](30-security-demo.log) |
+| 25 | Полный прогон после security-фиксов: build/test/fmt `--locked` | **PASS**: **154 passed / 0 failed / 2 ignored**, fmt PASS; `relay_live` PASS | [29-security-tests.log](29-security-tests.log) |
 
 Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI, интеграция
-с кошельками (embedded + sidecar API) и live Tor (cross-process direct onion на
-GCP VM) — PASS; известных P0–P2 дефектов нет; локальная песочница сама по себе
-не имеет Tor-выхода, поэтому live-прогон выполнен на GCP и привязан к коммиту.**
+с кошельками (embedded + sidecar API + console) и security-hardening — PASS;
+live Tor (cross-process direct onion на GCP VM) — PASS; известных P0–P2 дефектов
+нет. Остаточные v1-ограничения (sender anonymity против relay, address-key
+reuse, residual direct-flood) явно описаны в `docs/SECURITY.md`; локальная
+песочница сама по себе не имеет Tor-выхода, поэтому live-прогон выполнен на GCP
+и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `a2fc6920ab6759ec625e5bf9476800d96ef3803ac0b60400095028221a37dc52`
+SHA-256 — `176e4afb8913b4d773f6bfb0d07ad53f337bec24107e316bf9fe495c13276d55`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
@@ -83,15 +91,17 @@ SHA-256 — `a2fc6920ab6759ec625e5bf9476800d96ef3803ac0b60400095028221a37dc52`
 > изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
 > добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
 > 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
-> актуальный freeze-манифест — `a2fc6920…dc52`. VERIFY.md оставлен как
+> актуальный freeze-манифест — `176e4afb…6d55`. VERIFY.md оставлен как
 > исторический артефакт.
 
 ### Что именно подтверждено
 
 - сборка всего workspace offline из вендора, `--locked` без расхождений;
-- 125 автотестов: протокол (envelope/crypto/PoW/TTL/ACK/квоты/quarantine),
-  19 тестов relay (HTTP API, signed ACK, PoW, лимиты, restart-персистентность),
-  onion-векторы Tor v3, loopback e2e двух идентичностей, CLI-процессы;
+- 154 автотеста: протокол (envelope/crypto/PoW/TTL/ACK/квоты/quarantine),
+  23 теста relay (HTTP API, signed ACK, PoW, лимиты, fetch proof, canonical
+  UUID, burst-очередь, restart-персистентность), onion-векторы Tor v3,
+  loopback e2e двух идентичностей, CLI-процессы, web-UI guard, wallet API и
+  wallet console guard, private-file tests;
 - ignored `relay_live`: реальный дочерний процесс `flint-relay`, битые
   envelope-ы в quarantine, restart skip;
 - CLI: `keygen/address/send/fetch` с реальными процессами; повторный fetch после
@@ -104,7 +114,12 @@ SHA-256 — `a2fc6920ab6759ec625e5bf9476800d96ef3803ac0b60400095028221a37dc52`
 - **интеграция с кошельками**: `WalletService`/`flintmsg-walletd` — деривация
   seed, encrypted history/contacts/read markers, cursor/events API; проверено
   двумя реальными daemon-процессами и реальным relay (text + encrypted
-  Slatepack, contacts, unread/read, auth/validation).
+  Slatepack, contacts, unread/read, auth/validation); плюс wallet console
+  (`flintmsg-wallet-ui`) с proxy-токеном и Host/Origin guard;
+- **security hardening**: signed fetch proof и canonical UUID на реальном relay,
+  direct-mode burst без shared rate limit, owner-only secret files (wallet/CLI),
+  UI/console browser guard — [29-security-tests.log](29-security-tests.log),
+  [30-security-demo.log](30-security-demo.log).
 
 ### Что НЕ подтверждено (честно)
 
@@ -117,6 +132,12 @@ SHA-256 — `a2fc6920ab6759ec625e5bf9476800d96ef3803ac0b60400095028221a37dc52`
 - **Интеграция с кошельками**: API проверен на двух реальных daemon-процессах и
   реальном relay; автоматическая обработка Slatepack/RPC кошелька и iOS/FFI-сборка
   в эту поставку не входят (слой только транспортирует armor).
+- **Остаточные v1-ограничения**: relay может проверять известного кандидата-
+  отправителя по публичной внешней подписи (sender anonymity против relay не
+  обещается); повторное использование seed адрес-ключа связывает онлайновость
+  onion с платёжным адресом; sustained direct-flood может задерживать доставку
+  (sender-authenticated quotas в v1 нет). Все три пункта явно описаны в
+  `docs/SECURITY.md` и не выдаются за PASS.
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.
 - **Аудит безопасности и mainnet**: вне задачи; forward secrecy нет, это
   DEV/testnet-инструмент.

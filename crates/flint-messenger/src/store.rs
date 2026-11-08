@@ -19,6 +19,12 @@ use crate::MAX_TTL_SECS;
 pub trait Transport: Send + Sync {
     fn deliver(&self, envelope: &Envelope) -> Result<()>;
     fn fetch(&self, recipient: &Address, now: u64, limit: usize) -> Result<Vec<Envelope>>;
+
+    /// Fetch authenticated by the recipient's key. Relays that require a fetch
+    /// proof override this; local mailboxes keep the legacy behaviour.
+    fn fetch_signed(&self, recipient: &Identity, now: u64, limit: usize) -> Result<Vec<Envelope>> {
+        self.fetch(recipient.address(), now, limit)
+    }
     fn ack(&self, recipient: &Address, ids: &[String]) -> Result<usize>;
 
     /// Ack with proof of possession. Stores that already trust the local caller
@@ -209,9 +215,7 @@ impl<T: Transport> Messenger<T> {
             .saturating_add(skip.len())
             .max(limit.saturating_add(64))
             .min(1000);
-        let envelopes = self
-            .transport
-            .fetch(recipient.address(), now, fetch_limit)?;
+        let envelopes = self.transport.fetch_signed(recipient, now, fetch_limit)?;
         let mut batch = ReceiveBatch {
             opened: Vec::new(),
             duplicates: Vec::new(),
