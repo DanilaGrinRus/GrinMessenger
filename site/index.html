@@ -59,8 +59,8 @@
         <a class="btn" href="#quickstart">Quick start</a>
       </div>
       <p class="fineprint">
-        DEV/testnet tool, not audited. Live Tor could not be verified in the build
-        environment — the project says so instead of calling it a pass.
+        DEV/testnet tool, not audited. Live Tor was verified on a Google Cloud VM
+        with two real processes; the local build sandbox has no Tor egress.
       </p>
     </div>
     <figure class="shot">
@@ -131,14 +131,14 @@
     <article class="card status-card is-ready">
       <p class="status-tag">Available for testing</p>
       <h2>Build &amp; tests</h2>
-      <p>Offline build and the Rust test suite pass: 127 passed, 0 failed, 3 ignored (including the web-UI integration tests).</p>
+      <p>Offline build and the Rust test suite pass: 128 passed, 0 failed, 2 ignored (including the web-UI integration tests).</p>
       <p class="mono small">cargo test --workspace · Windows x64 MSVC</p>
     </article>
     <article class="card status-card">
-      <p class="status-tag">Needs Tor</p>
+      <p class="status-tag">Tor verified on GCP</p>
       <h2>Direct mode</h2>
-      <p>Recipient publishes an onion through in-process Arti; peers must be online. First bootstrap takes 30–150 s.</p>
-      <p class="mono small">flintmsg serve · flintmsg send</p>
+      <p>Recipient publishes an onion through in-process Arti; peers must be online. Live two-process delivery verified on a GCP VM (2026-11-08); first bootstrap takes 30–150 s.</p>
+      <p class="mono small">flintmsg serve · flintmsg send · evidence log in repo</p>
     </article>
     <article class="card status-card is-soon">
       <p class="status-tag">Works without Tor</p>
@@ -294,7 +294,7 @@ GET  /flint/v1/health       {ok:true}</pre>
           <code>ttl</code>, <code>pow_bits</code>, transport route and payload
           size. The page also exports the transcript as JSON and shows the honest
           transport state (<code>tor</code> / <code>ready</code> /
-          <code>error</code>) without pretending that a Tor path was verified.
+          <code>error</code>) without pretending about the transport state.
         </p>
         <pre class="code">flintmsg-ui --data ui-data \
   --relay http://127.0.0.1:8080 --plain
@@ -385,8 +385,9 @@ let env = msg.send(&amp;id, &amp;recipient,
         <h3 class="ok">Verified</h3>
         <ul>
           <li>Offline build of the whole workspace</li>
-          <li>127 automated tests: protocol, gateway, CLI, web UI, onion vectors</li>
+          <li>128 automated tests: protocol, gateway, CLI, web UI, onion vectors</li>
           <li>Web UI: integration tests with a real relay + live browser screenshot</li>
+          <li>Live Tor on a GCP VM: two real processes, direct onion delivery + signed ACK</li>
           <li>Two-process loopback E2E: send → open → signed ACK → re-fetch empty</li>
           <li>Ignored relay-live test with a real <code>flint-relay</code> process</li>
           <li>Independent verification: no P0–P2 defects, 9 findings fixed</li>
@@ -396,8 +397,7 @@ let env = msg.send(&amp;id, &amp;recipient,
       <article class="card list-card">
         <h3 class="no">Not verified / not included</h3>
         <ul>
-          <li>Live Tor: Arti bootstrap timed out — network unreachable here</li>
-          <li>Direct-mode CLI against a real onion</li>
+          <li>Live Tor from this local sandbox (no Tor egress) — verified on GCP instead</li>
           <li>Live Nostr transport (needs an external relay)</li>
           <li>Forward secrecy, groups, attachments</li>
           <li>Security audit; mainnet use</li>
@@ -406,9 +406,9 @@ let env = msg.send(&amp;id, &amp;recipient,
       </article>
     </div>
     <div class="facts">
-      <div class="fact"><strong>127</strong><span>automated tests passing · 0 failed · 3 ignored</span></div>
+      <div class="fact"><strong>128</strong><span>automated tests passing · 0 failed · 2 ignored</span></div>
       <div class="fact"><strong>0</strong><span>audits, promises or mainnet-readiness claims</span></div>
-      <div class="fact"><strong>1</strong><span>Tor path reported as NOT VERIFIED instead of faked as a pass</span></div>
+      <div class="fact"><strong>1</strong><span>live Tor run on GCP: two processes, direct onion, signed ACK</span></div>
     </div>
     <p class="callout">
       Reports, logs and hashes live in the repository under

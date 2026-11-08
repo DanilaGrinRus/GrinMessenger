@@ -26,12 +26,13 @@ RPC и платёжной интеграции **не переносился**.
 | OS | Windows x64 (10.0.26100), PowerShell 7 |
 | Rust | cargo/rustc 1.99.1 (MSVC, `x86_64-pc-windows-msvc`) |
 | Сборка | offline, вендор `C:\DHW\vendor` через унаследованный `C:\DHW\.cargo\config.toml`; crates.io в окружении недоступен |
+| GCP (live Tor) | Ubuntu 24.04 VM `grin-linux-build` (e2-medium, us-central1-a), Rust 1.99.1, публичный интернет; репозиторий клонирован с GitHub |
 | Upstream-клон | `C:\DHW\tmp\flint-upstream` (read-only, не входит в поставку) |
 | Версия | workspace `0.1.0`, `rust-version = 1.92` |
 | Исходники | 37 `.rs`, 11 734 строк; `Cargo.lock` 556 пакетов; + один встроенный `ui.html` |
 | Бинари (build output) | `target/debug/flintmsg.exe` 26.97 МБ, `target/debug/flint-relay.exe` 3.26 МБ, `target/debug/flintmsg-ui.exe` 27.06 МБ; **в поставку не входят, пересобираются из исходников** |
 | Хэши upstream-файлов | [upstream-sources.sha256](upstream-sources.sha256), 40 файлов |
-| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 60 файлов |
+| Freeze-манифест поставки | [source-sha256.sha256](source-sha256.sha256), 59 файлов |
 
 ## Проверки
 
@@ -50,7 +51,7 @@ RPC и платёжной интеграции **не переносился**.
 | 3 | `cargo fmt --all -- --check` | **PASS** (EXIT_CODE=0) | [03-fmt.log](03-fmt.log) |
 | 4 | `cargo test -p flint-gateway --test relay_live -- --ignored --test-threads=1` | **PASS**, 1 passed: реальный процесс `flint-relay`, quarantine битых envelope и restart-skip | [04-relay-live.log](04-relay-live.log) |
 | 5 | Двухпроцессный loopback e2e: `flint-relay.exe` + `flintmsg keygen/send/fetch` | **PASS**: доставка, открытие, signed ACK, повторный fetch пуст | [06-e2e-demo.log](06-e2e-demo.log) |
-| 6 | `cargo test -p flint-tor-arti --test live_onion -- --ignored --nocapture` (live Tor) | **FAILED, NOT VERIFIED/BLOCKED**: bootstrap timeout 300 с; в окружении нет доступа к сети Tor (dir-auth :9101 недоступен, локального SOCKS нет), при этом clearnet `1.1.1.1:443` открыт. PASS не заявляется. | [05-live-tor.log](05-live-tor.log) |
+| 6 | `cargo test -p flint-tor-arti --test live_onion -- --ignored --nocapture` (live Tor, исторический прогон) | **FAILED, NOT VERIFIED/BLOCKED** на тот момент: bootstrap timeout 300 с в локальной песочнице; позже live Tor проверен cross-process-прогоном на GCP (строка 17). | [05-live-tor.log](05-live-tor.log) |
 | 7 | Чистая сборка из состава поставки (каталоги `target*`/`.tmp*` удалены) | **PASS**: `cargo build --workspace --offline --locked` 70.1 с, EXIT 0; `cargo test --workspace --offline --locked` 125 passed / 0 failed / 3 ignored, EXIT 0 | [07-clean-build.log](07-clean-build.log), [08-clean-tests.log](08-clean-tests.log) |
 | 8 | Post-rename branding (`GrinMessageModule`, `repository` в манифестах) + повторная сборка/тесты/fmt | **PASS**: build 160 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [09-rename-build.log](09-rename-build.log), [10-rename-tests.log](10-rename-tests.log), [11-rename-fmt.log](11-rename-fmt.log) |
 | 9 | Смена имени репозитория на `GrinMessenger` (URL в README/PROVENANCE/Cargo.toml) + сборка/тесты/fmt | **PASS**: build 61 с EXIT 0; test 125/0/3 EXIT 0; fmt EXIT 0 | [12-repo-rename-build.log](12-repo-rename-build.log), [13-repo-rename-tests.log](13-repo-rename-tests.log), [14-repo-rename-fmt.log](14-repo-rename-fmt.log) |
@@ -60,13 +61,17 @@ RPC и платёжной интеграции **не переносился**.
 | 13 | Веб-UI: сборка, тесты (`flint-messenger-ui`), fmt | **PASS**: build EXIT 0; tests **127 passed / 0 failed / 3 ignored** (включая 2 UI интеграционных), fmt EXIT 0 | [21-ui-build.log](21-ui-build.log), [22-ui-tests.log](22-ui-tests.log), [23-ui-fmt.log](23-ui-fmt.log) |
 | 14 | Веб-UI: живое демо на loopback (relay + CLI-пир ↔ браузер), скриншот | **PASS**: 3 входящих + ответ из UI; CLI-пир получил ответ; signed ACK; история/контакты/экспорт; скриншот `docs/assets/ui.png` (1440×900) | [20-ui-demo.log](20-ui-demo.log), [20-ui-state.json](20-ui-state.json) |
 | 15 | GitHub Pages: редеплой сайта с секцией Web UI и скриншотом | **PASS**: run 42425449844 = success (sha e2d4ae6); https://danilagrinrus.github.io/GrinMessenger/ = HTTP 200, секция «Web UI» и `assets/ui.png` на месте | [24-pages-ui.log](24-pages-ui.log) |
+| 16 | GCP VM: клон опубликованного репозитория, сборка на Linux (Ubuntu, Rust 1.99) | **PASS**: `cargo build --workspace` 20m 58s (cold), инкрементальная пересборка после фиксов ~37 с | [23-gcp-build.log](23-gcp-build.log) |
+| 17 | GCP VM: **live Tor/Arti, два реальных процесса** (`flintmsg serve` публикует onion через Arti; `flintmsg send` доставляет direct onion; получатель открывает и шлёт signed ACK) | **PASS** (2026-11-08): Arti bootstrap 100%, onion опубликован, `SEND_EXIT=0`, `RECEIVED=1`, signed ACK; плюс `cargo test --workspace` на Linux — 128/0/2 после фиксов | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
+| 18 | Найден и исправлен wire-баг live-режима: hyper отправлял absolute-form request-target, gateway отвечал 404; фикс + регрессионный тест | **PASS**: commit `d828211` (origin-form + Host; gateway принимает absolute-form), тест `absolute_form_request_target_is_routed_correctly`; после фикса direct onion доставка работает | [25-live-tor-gcp.log](25-live-tor-gcp.log) |
 
-Итог на момент отчёта: **static/unit/build/manual loopback и веб-UI (relay/loopback) —
-PASS; live Tor — FAILED/NOT VERIFIED (bootstrap timeout при недоступной сети Tor);
-mock за live не выдаётся.**
+Итог на момент отчёта: **static/unit/build/manual loopback, веб-UI и live Tor
+(cross-process direct onion на GCP VM) — PASS; известных P0–P2 дефектов нет;
+локальная песочница сама по себе не имеет Tor-выхода, поэтому live-прогон
+выполнен на GCP и привязан к коммиту.**
 
 Freeze-манифест кода/доков/сайта: [source-sha256.sha256](source-sha256.sha256), его
-SHA-256 — `4ff657ce371523ffd81e34cfa338787c0edbedd1a46cce59dbedb38e759b558f`
+SHA-256 — `b4b35bd9fdb48051692d6628f9d8abb1024fa9f7ab4083384d400c0c9db0318f`
 ([source-sha256.sha256.hash](source-sha256.sha256.hash)). `evidence/` намеренно
 не входит в freeze-манифест и может дополняться VERIFY.md/логами.
 
@@ -75,7 +80,7 @@ SHA-256 — `4ff657ce371523ffd81e34cfa338787c0edbedd1a46cce59dbedb38e759b558f`
 > изменены branding-файлы, поле `repository`, имена каталога/репозитория, затем
 > добавлены английский перевод docs/`site/` и веб-UI (`crates/flint-messenger-ui`,
 > 2026-11-08); Rust-код ядра не менялся, повторные build/test/fmt — логи 09–23,
-> актуальный freeze-манифест — `4ff657ce…b558f`. VERIFY.md оставлен как
+> актуальный freeze-манифест — `b4b35bd9…0318f`. VERIFY.md оставлен как
 > исторический артефакт.
 
 ### Что именно подтверждено
@@ -89,13 +94,17 @@ SHA-256 — `4ff657ce371523ffd81e34cfa338787c0edbedd1a46cce59dbedb38e759b558f`
 - CLI: `keygen/address/send/fetch` с реальными процессами; повторный fetch после
   signed ACK не возвращает сообщение;
 - onion-адрес из seed совпадает с Tor v3 вектором
-  `2a6at2obto3uvkpkitqp4wxcg6u36qf534eucbskqciturczzc5suyid`.
+  `2a6at2obto3uvkpkitqp4wxcg6u36qf534eucbskqciturczzc5suyid`;
+- **live Tor/Arti**: на GCP VM два независимых процесса `flintmsg serve`/`send`
+  провели direct onion доставку с signed ACK; попутно найден и исправлен
+  wire-баг absolute-form (commit `d828211`) с регрессионным тестом.
 
 ### Что НЕ подтверждено (честно)
 
-- **Live Tor**: результат зависит от доступности сети Tor в окружении; при
-  недоступности — NOT VERIFIED/BLOCKED с логом, не PASS. Арти-клиент/сервис
-  собираются и юнит-тесты проходят, но это не доказывает живой onion.
+- **Live Tor**: в локальной песочнице Tor-выхода нет, поэтому первый прогон был
+  NOT VERIFIED; на GCP VM (Ubuntu, публичный интернет) live-прогон двух реальных
+  процессов прошёл: onion опубликован через Arti, direct-доставка и signed ACK
+  подтверждены ([25-live-tor-gcp.log](25-live-tor-gcp.log)).
 - **Direct-режим веб-UI**: требует Tor/Arti, в этом окружении не проверялся;
   проверен relay/loopback-режим (реальный браузер + реальный relay).
 - **Публичный relay/Tor-сеть**: не разворачивались; relay проверен на loopback.

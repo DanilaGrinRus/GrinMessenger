@@ -24,12 +24,13 @@ this is not the Flint wallet.
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
-Status (2026-11-08): **extraction and adaptation are complete; offline build is
-PASS, 127 automated tests are PASS (0 failed, 3 ignored), the loopback E2E,
-real CLI processes and the local web UI are PASS. Live Tor is FAILED /
-NOT VERIFIED: in the build environment Arti did not finish bootstrap within
-300 s because the Tor network is unreachable. This is not reported as a pass.**
-See [evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
+Status (2026-11-08): **extraction, adaptation and an optional local web UI are
+complete; offline build is PASS, 128 automated tests are PASS (0 failed,
+2 ignored), the loopback E2E, real CLI processes, the web UI and a live Tor
+two-peer direct-onion run on a Google Cloud VM are PASS.** The original build
+sandbox has no Tor egress; live Tor was therefore verified on a GCP VM
+(Ubuntu, Arti bootstrapped 100%, direct onion delivery + signed ACK), see
+[evidence/20261107-extraction/SUMMARY.md](evidence/20261107-extraction/SUMMARY.md)
 and [REPORT.md](evidence/20261107-extraction/REPORT.md) (the detailed extraction
 report and verifier logs are kept in Russian as historical evidence).
 This is a DEV/testnet tool: not audited, not ready for mainnet.
@@ -160,18 +161,23 @@ For an external Tor with SOCKS5, `GatewayTransport::with_socks` and
 
 ```powershell
 cargo test --workspace                                      # unit + integration, no live Tor
-cargo test -p flint-tor-arti --test live_onion -- --ignored  # needs the Tor network
 cargo test -p flint-gateway --test relay_live -- --ignored    # spawns flint-relay
 ```
 
-Run results (commands, PASS/FAIL, live Tor NOT VERIFIED when the network is
-unavailable) are in [evidence/20261107-extraction/](evidence/20261107-extraction/).
-Summary: `cargo build --workspace --offline --locked` — PASS;
-`cargo test --workspace --offline --locked` — 127 passed / 0 failed / 3 ignored
-(`relay_live`, live Nostr, `live_onion`); `cargo fmt --check` — PASS.
-The web-UI integration tests spawn a real UI process and a real relay, and the
-demo screenshot in [docs/assets/ui.png](docs/assets/ui.png) was taken from a
-running instance.
+Run results (commands, PASS/FAIL) are in
+[evidence/20261107-extraction/](evidence/20261107-extraction/). Summary:
+`cargo build --workspace --offline --locked` — PASS;
+`cargo test --workspace --offline --locked` — 128 passed / 0 failed / 2 ignored
+(`relay_live`, live Nostr); `cargo fmt --check` — PASS. The web-UI integration
+tests spawn a real UI process and a real relay; the screenshot in
+[docs/assets/ui.png](docs/assets/ui.png) is from a running instance.
+
+Live Tor was verified on a GCP VM with two real processes: `flintmsg serve`
+published an onion through Arti and `flintmsg send` delivered a direct onion
+envelope to it; the receiver opened it and sent a signed ACK. Log:
+[evidence/20261107-extraction/25-live-tor-gcp.log](evidence/20261107-extraction/25-live-tor-gcp.log).
+The project has no in-process "onion service + client in one runtime" self-test:
+that setup shares one Tokio runtime and is not representative of two peers.
 
 ## Not included
 

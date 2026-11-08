@@ -121,6 +121,11 @@ the server binds loopback and must not be exposed.
 - The web UI is a thin shell: one OS thread per HTTP connection, one background
   poll thread, no async runtime of its own; it reuses the Arti runtime kept by
   `flint-tor-arti`.
+- HTTP on the wire: `TorHttpClient` sends an origin-form request target with an
+  explicit `Host` header, and the gateway also normalizes absolute-form targets
+  (regression-tested). This matters: hyper emits absolute-form when the request
+  URI carries a scheme+authority, and a minimal origin server would otherwise
+  answer 404 for every `/flint/v1/*` call.
 
 ## Out of scope
 

@@ -82,6 +82,10 @@ origin.
 8. Local web UI added (2026-11-08): `crates/flint-messenger-ui` (Rust std HTTP
    server + one embedded HTML page), integration tests, live demo screenshot and
    a landing-page section. It adds no new external crates.
+9. Wire fix (2026-11-08): `TorHttpClient` now sends origin-form request targets
+   with an explicit `Host` header, and the gateway accepts absolute-form targets
+   too (regression test `absolute_form_request_target_is_routed_correctly`).
+   Live-verified with two processes over Tor on a GCP VM.
 
 ## Reproducing the provenance check
 

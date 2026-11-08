@@ -33,27 +33,38 @@ Arti. Screenshot of a live demo (relay on loopback, CLI peer ↔ browser):
 [docs/assets/ui.png](../../docs/assets/ui.png). It has no authentication and
 binds loopback only.
 
+## Live Tor fix (2026-11-08)
+
+The first live run exposed a real wire bug: hyper emitted absolute-form request
+targets (`POST http://host/path`) while the gateway parsed only origin-form paths,
+so direct delivery returned HTTP 404. Fixed in commit `d828211`:
+`TorHttpClient` now sends origin-form plus an explicit `Host` header, and the
+gateway also accepts absolute-form targets (regression test
+`absolute_form_request_target_is_routed_correctly`). The GCP VM run after the
+fix delivered a direct onion message end to end.
+
 ## Verification result
 
 | Check | Result |
 |---|---|
 | Offline build (`cargo build --workspace --offline --locked`) | **PASS** (exit 0) |
-| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 127 passed, 0 failed, 3 ignored |
+| Automated tests (`cargo test --workspace --offline --locked`) | **PASS**: 128 passed, 0 failed, 2 ignored |
 | `cargo fmt --check` | **PASS** |
 | Ignored `relay_live` test (spawns the real `flint-relay` process) | **PASS**, 1 passed |
 | Web-UI integration tests (real relay + real `flintmsg-ui` process) | **PASS**, 2 passed |
 | Web-UI demo (relay loopback, CLI peer ↔ browser, screenshot) | **PASS**: delivery both ways, signed ACK, contact + transcript export |
+| **Live Tor** (cross-process direct onion on a GCP VM) | **PASS** (2026-11-08): Arti bootstrapped 100%, `flintmsg serve` published an onion, `flintmsg send` delivered a direct onion envelope, the receiver opened it and sent a signed ACK; log [25-live-tor-gcp.log](25-live-tor-gcp.log). The local build sandbox has no Tor egress. |
 | Two-process loopback E2E (`flint-relay` + `flintmsg keygen/send/fetch`) | **PASS**: delivery, open, signed ACK, empty re-fetch, offline send fails |
 | Independent verification (separate agent, own build dir) | **PASS**, no P0–P2 defects; 9 findings fixed and re-checked |
 | Live Tor (onion service through Arti) | **FAILED / NOT VERIFIED / BLOCKED**: Arti bootstrap timed out after 300 s; the Tor network is unreachable in the build environment. Not reported as a pass. |
 
-The 3 ignored tests are: `relay_live` (run explicitly and PASS), the live Nostr
-test (needs an external relay) and `live_onion` (needs the Tor network).
+The 2 ignored tests are: `relay_live` (run explicitly and PASS) and the live
+Nostr test (needs an external relay).
 
 ## Freeze manifest
 
 The delivered source tree is pinned by
-[source-sha256.sha256](source-sha256.sha256) (60 files: crates, Cargo manifests,
+[source-sha256.sha256](source-sha256.sha256) (59 files: crates, Cargo manifests,
 docs, site, screenshot, GitHub workflow, README, licenses, notices; `evidence/`
 is intentionally excluded). Its SHA-256 is stored in
 [source-sha256.sha256.hash](source-sha256.sha256.hash).
@@ -61,7 +72,9 @@ is intentionally excluded). Its SHA-256 is stored in
 
 ## Known limitations
 
-- Live Tor/direct-onion CLI/UI is unverified in this environment.
+- The local build sandbox has no Tor egress; live Tor was therefore verified on
+  a GCP VM (two-process direct onion, see above). Direct-mode UI/CLI against a
+  real onion is covered by that CLI run, not by a live UI run.
 - The web UI has no authentication; it is loopback-only by design.
 - No forward secrecy, no groups/attachments, no offline guarantee.
 - Not audited; DEV/testnet tool; no mainnet readiness claim.
