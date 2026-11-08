@@ -70,6 +70,38 @@ fn json_state(port: u16) -> Value {
     serde_json::from_str(&body).expect("state json")
 }
 
+/// Poll the UI until the process has bound its listener and the transport is
+/// ready. The child process is spawned just before this call, so an immediate
+/// `GET` can race with its startup (connection refused).
+fn wait_ui_ready(port: u16, timeout: Duration) -> Value {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(state) = try_json_state(port) {
+            if state["status"]["phase"] == "ready" {
+                return state;
+            }
+        }
+        if Instant::now() >= deadline {
+            panic!("UI did not become ready on port {port}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn try_json_state(port: u16) -> Option<Value> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    let request =
+        format!("GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).ok()?;
+    stream.flush().ok();
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).ok()?;
+    let text = String::from_utf8_lossy(&raw).to_string();
+    let body = text.split_once("\r\n\r\n")?.1;
+    serde_json::from_str(body).ok()
+}
+
 fn wait_until(deadline: Instant, mut predicate: impl FnMut() -> bool) -> bool {
     while Instant::now() < deadline {
         if predicate() {
@@ -129,15 +161,7 @@ fn ui_chat_roundtrip_and_contacts() {
     let _ui = spawn_ui(port, &data_dir, &gateway.url());
 
     // Wait for the UI transport to become ready and the identity to appear.
-    let deadline = Instant::now() + Duration::from_secs(20);
-    let mut state = json_state(port);
-    assert!(
-        wait_until(deadline, || {
-            state = json_state(port);
-            state["status"]["phase"] == "ready"
-        }),
-        "UI transport did not become ready: {state}"
-    );
+    let state = wait_ui_ready(port, Duration::from_secs(20));
     let alice_address = state["identity"]["address"]
         .as_str()
         .expect("address")
@@ -278,14 +302,7 @@ fn invalid_requests_are_rejected() {
     let data_dir = unique_dir("invalid");
     let port = free_port();
     let _ui = spawn_ui(port, &data_dir, &gateway.url());
-
-    let deadline = Instant::now() + Duration::from_secs(20);
-    let mut ready = false;
-    wait_until(deadline, || {
-        ready = json_state(port)["status"]["phase"] == "ready";
-        ready
-    });
-    assert!(ready, "UI not ready");
+    let _ = wait_ui_ready(port, Duration::from_secs(20));
 
     // Bad JSON.
     let (status, body) = http(port, "POST", "/api/send", "{not json");
