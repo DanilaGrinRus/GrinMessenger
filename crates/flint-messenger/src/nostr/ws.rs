@@ -28,6 +28,7 @@ use super::relay::{Relay, RelayFilter};
 use crate::error::{Error, Result};
 
 /// Budget for DNS, TCP and the WebSocket/TLS handshake together.
+#[allow(dead_code)] // only referenced by the non-test branch of connect_budget`r
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Production uses ten seconds; tests use a short budget so a stalled relay can

@@ -429,7 +429,7 @@ fn handle(mut stream: TcpStream, state: Arc<State>) -> Result<()> {
             };
             let value: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
             let to = value.get("to").and_then(Value::as_str).unwrap_or("");
-            if let Err(_) = Address::parse(to) {
+            if Address::parse(to).is_err() {
                 return write_response(
                     &mut stream,
                     400,
@@ -1085,7 +1085,7 @@ mod tests {
 
         assert_eq!(
             transport
-                .ack(bob.address(), &[envelope.id.clone()])
+                .ack(bob.address(), std::slice::from_ref(&envelope.id))
                 .expect("ack"),
             1
         );
@@ -1229,7 +1229,7 @@ mod tests {
         assert_eq!(status, 401, "{body}");
 
         let signed = transport
-            .ack_signed(&bob, &[envelope.id.clone()])
+            .ack_signed(&bob, std::slice::from_ref(&envelope.id))
             .expect("signed ack");
         assert_eq!(signed, 1);
         assert!(transport

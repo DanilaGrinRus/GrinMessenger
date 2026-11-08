@@ -255,7 +255,12 @@ mod tests {
             mailbox.fetch(bob.address(), unix_now(), 10).unwrap().len(),
             1
         );
-        assert_eq!(mailbox.ack(bob.address(), &[item.id.clone()]).unwrap(), 1);
+        assert_eq!(
+            mailbox
+                .ack(bob.address(), std::slice::from_ref(&item.id))
+                .unwrap(),
+            1
+        );
         assert!(mailbox
             .fetch(bob.address(), unix_now(), 10)
             .unwrap()

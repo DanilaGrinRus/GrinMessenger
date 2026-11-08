@@ -287,9 +287,9 @@ fn save_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     Ok(())
 }
 
-fn load_json<T: for<'de> Deserialize<'de>>(path: &Path) -> T
+fn load_json<T>(path: &Path) -> T
 where
-    T: Default,
+    T: for<'de> Deserialize<'de> + Default,
 {
     let Ok(text) = fs::read_to_string(path) else {
         return T::default();
@@ -298,6 +298,9 @@ where
 }
 
 // ---------- runtime state ----------
+
+type FetchSlot = (String, Arc<dyn HttpConnector>);
+type SendSlot = (Option<String>, Arc<dyn HttpConnector>);
 
 struct Shared {
     identity: Identity,
@@ -317,9 +320,9 @@ struct Shared {
     contacts: Mutex<Vec<Contact>>,
     status: Mutex<Status>,
     /// (base url, connector) used to fetch the inbox.
-    fetch: Mutex<Option<(String, Arc<dyn HttpConnector>)>>,
+    fetch: Mutex<Option<FetchSlot>>,
     /// (fixed remote or None for direct per-recipient, connector) used to send.
-    send: Mutex<Option<(Option<String>, Arc<dyn HttpConnector>)>>,
+    send: Mutex<Option<SendSlot>>,
     onion_service: Mutex<Option<OnionService>>,
     gateway: Mutex<Option<Gateway>>,
 }

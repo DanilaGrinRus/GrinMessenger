@@ -608,6 +608,8 @@ mod tests {
 
     #[test]
     fn fixed_time_is_only_used_in_tests() {
-        assert!(NOW > 1_000_000_000);
+        const {
+            assert!(NOW > 1_000_000_000);
+        }
     }
 }

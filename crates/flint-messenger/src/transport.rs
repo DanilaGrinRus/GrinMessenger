@@ -387,7 +387,7 @@ impl Transport for GatewayTransport {
 
     fn fetch(&self, recipient: &Address, now: u64, limit: usize) -> Result<Vec<Envelope>> {
         let to = recipient.to_string();
-        let page = limit.max(1).min(100);
+        let page = limit.clamp(1, 100);
         let (status, response) =
             self.request("GET", &format!("/flint/v1/msg?to={to}&limit={page}"), b"")?;
         self.parse_fetch(recipient, now, limit, status, &response)
@@ -398,7 +398,7 @@ impl Transport for GatewayTransport {
     fn fetch_signed(&self, recipient: &Identity, now: u64, limit: usize) -> Result<Vec<Envelope>> {
         let address = recipient.address();
         let to = address.to_string();
-        let page = limit.max(1).min(100);
+        let page = limit.clamp(1, 100);
         let signature = recipient.sign_bytes(&fetch_proof_transcript(address, now));
         let sig = data_encoding::HEXLOWER.encode(&signature);
         let (status, response) = self.request(
@@ -611,7 +611,12 @@ mod tests {
             .expect("transport");
         let (_alice, bob) = parties();
         let id = "11111111-1111-4111-8111-111111111111".to_string();
-        assert_eq!(transport.ack_signed(&bob, &[id.clone()]).expect("ack"), 1);
+        assert_eq!(
+            transport
+                .ack_signed(&bob, std::slice::from_ref(&id))
+                .expect("ack"),
+            1
+        );
 
         let requests = connector.take_requests();
         assert_eq!(requests.len(), 1);

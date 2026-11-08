@@ -1,5 +1,9 @@
 # GrinMessenger
 
+[![CI](https://github.com/DanilaGrinRus/GrinMessenger/actions/workflows/ci.yml/badge.svg)](https://github.com/DanilaGrinRus/GrinMessenger/actions/workflows/ci.yml)
+[![Pages](https://github.com/DanilaGrinRus/GrinMessenger/actions/workflows/pages.yml/badge.svg)](https://danilagrinrus.github.io/GrinMessenger/)
+[![Release](https://github.com/DanilaGrinRus/GrinMessenger/actions/workflows/release.yml/badge.svg)](https://github.com/DanilaGrinRus/GrinMessenger/releases)
+
 Standalone Grin messenger module, extracted from the
 [Flint](https://github.com/DanilaGrinRus/Flint) project: signed and encrypted
 envelope messages, direct delivery to a Tor v3 onion through **in-process Arti**,
@@ -26,6 +30,7 @@ this is not the Flint wallet.
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Security / audit triage | [docs/SECURITY.md](docs/SECURITY.md) |
 | Wallet integration | [docs/WALLET_INTEGRATION.md](docs/WALLET_INTEGRATION.md) |
+| Releases / CI | [docs/RELEASE.md](docs/RELEASE.md) |
 | Third-party components | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 Status (2026-11-08): **extraction, adaptation, a local web UI, wallet

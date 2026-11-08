@@ -1,0 +1,107 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux-x86_64
+          - os: windows-latest
+            artifact: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: release build
+        run: cargo build --release --locked
+      - name: package
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            exe=".exe"
+          else
+            exe=""
+          fi
+          cp "target/release/flintmsg${exe}" dist/
+          cp "target/release/flint-relay${exe}" dist/
+          cp "target/release/flintmsg-ui${exe}" dist/
+          cp "target/release/flintmsg-walletd${exe}" dist/
+          cp "target/release/flintmsg-wallet-ui${exe}" dist/
+          cp Cargo.lock dist/Cargo.lock
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.artifact }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CycloneDX SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, sbom]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: dist
+      - name: show files
+        run: find dist -maxdepth 2 -type f -printf '%P %s bytes\n'
+      - name: publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

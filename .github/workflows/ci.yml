@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust (pinned for reproducible clippy/fmt)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: fmt
+        if: runner.os == 'Linux'
+        run: cargo fmt --all -- --check
+      - name: clippy (-D warnings)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: build
+        run: cargo build --workspace --locked
+      - name: tests
+        run: cargo test --workspace --locked
+      - name: real relay process test
+        if: runner.os == 'Linux'
+        run: cargo test -p flint-gateway --test relay_live --locked -- --ignored --test-threads=1
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

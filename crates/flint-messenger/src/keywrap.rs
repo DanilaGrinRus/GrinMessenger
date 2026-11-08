@@ -174,7 +174,7 @@ pub fn rewrap(old_password: &str, new_password: &str, wrapped: &[u8]) -> Result<
     let key = unwrap(old_password, wrapped)?;
     let updated = wrap(new_password, &key)?;
     let check = unwrap(new_password, &updated)?;
-    if &check[..] != &key[..] {
+    if check[..] != key[..] {
         return Err(Error::Crypto(
             "ключ истории: проверка после переупаковки не совпала".into(),
         ));

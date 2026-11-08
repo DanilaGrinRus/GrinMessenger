@@ -122,9 +122,10 @@ impl ArtiRuntimeWrapper {
 static ARTI_RUNTIME: LazyLock<Mutex<Option<ArtiRuntimeWrapper>>> =
     LazyLock::new(|| Mutex::new(ArtiRuntimeWrapper::create().ok()));
 
-static ARTI_CLIENT_CONFIG: LazyLock<
-    Mutex<Option<(Arc<TorClient<TokioNativeTlsRuntime>>, TorClientConfig)>>,
-> = LazyLock::new(|| Mutex::new(None));
+type CachedArtiClient = Arc<TorClient<TokioNativeTlsRuntime>>;
+type ArtiClientCache = Mutex<Option<(CachedArtiClient, TorClientConfig)>>;
+
+static ARTI_CLIENT_CONFIG: LazyLock<ArtiClientCache> = LazyLock::new(|| Mutex::new(None));
 
 static ARTI_PROXY_SERVICES: LazyLock<Mutex<HashMap<String, TorService>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -524,7 +525,7 @@ fn add_service_key(
         Some(expanded) => {
             key_manager
                 .insert(
-                    HsIdKey::from(expanded.public().clone()),
+                    HsIdKey::from(*expanded.public()),
                     &HsIdPublicKeySpecifier::new(hs_nickname.clone()),
                     KeystoreSelector::Primary,
                     true,

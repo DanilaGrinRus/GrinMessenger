@@ -8,7 +8,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -151,7 +151,7 @@ impl Drop for UiProcess {
     }
 }
 
-fn spawn_ui(port: u16, data_dir: &PathBuf, relay_url: &str) -> UiProcess {
+fn spawn_ui(port: u16, data_dir: &Path, relay_url: &str) -> UiProcess {
     let child = Command::new(env!("CARGO_BIN_EXE_flintmsg-ui"))
         .args([
             "--data",

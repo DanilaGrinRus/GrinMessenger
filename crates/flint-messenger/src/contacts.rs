@@ -271,9 +271,8 @@ impl ContactBook {
         let mut contacts = self.load()?;
         let now = unix_now();
         let updated = if let Some(existing) = contacts.iter_mut().find(|c| c.address == address) {
-            match nostr {
-                Some(value) => existing.nostr = value,
-                None => {}
+            if let Some(value) = nostr {
+                existing.nostr = value;
             }
             existing.updated_at = now;
             existing.clone()
@@ -308,6 +307,15 @@ fn sort(contacts: &mut [Contact]) {
             .cmp(&b.name.to_lowercase())
             .then_with(|| a.address.cmp(&b.address))
     });
+}
+
+fn validate_nostr(value: &str) -> Result<Option<String>> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let key = crate::nostr::parse_public_hex(trimmed)?;
+    Ok(Some(crate::nostr::hex_encode(&key.to_byte_array())))
 }
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -465,13 +473,4 @@ mod tests {
         assert!(path.exists(), "foreign lock was removed");
         let _ = std::fs::remove_dir_all(dir);
     }
-}
-
-fn validate_nostr(value: &str) -> Result<Option<String>> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-    let key = crate::nostr::parse_public_hex(trimmed)?;
-    Ok(Some(crate::nostr::hex_encode(&key.to_byte_array())))
 }

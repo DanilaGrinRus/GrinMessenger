@@ -1088,7 +1088,7 @@ mod tests {
         let caps = capabilities();
         assert_eq!(caps.api_version, 1);
         assert!(caps.kinds.iter().any(|kind| kind == "slatepack"));
-        assert_eq!(caps.slatepack_plaintext, false);
+        assert!(!caps.slatepack_plaintext);
         assert_eq!(caps.bind, "loopback");
     }
 }
