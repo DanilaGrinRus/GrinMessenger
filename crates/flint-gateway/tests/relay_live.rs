@@ -98,15 +98,18 @@ fn local_relay_quarantines_broken_envelopes_and_restart_skips_them() {
 
     let raw = GatewayTransport::new(&url).expect("raw transport");
     for n in 0..40 {
-        // A fresh seal gets a valid UUID and valid PoW; corrupt only the
-        // signature so the relay accepts it and the recipient reports it.
-        let mut bad = Envelope::seal_now(
+        // A legacy v1 envelope gets a valid UUID and PoW; corrupt only the
+        // outer signature (v1 still verifies it) so the relay accepts it and
+        // the recipient reports it as failed. v2 cannot be corrupted this way
+        // because the sender proof is inside the AEAD-protected payload.
+        let mut bad = Envelope::seal_legacy_v1(
             &alice,
             bob.address(),
             MessageKind::Text {
                 text: format!("broken {n}"),
             },
             DEFAULT_TTL_SECS,
+            flint_messenger::envelope::unix_now(),
         )
         .expect("seal broken");
         bad.signature[0] ^= 1;
